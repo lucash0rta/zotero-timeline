@@ -590,8 +590,8 @@ function render() {
   ctx.beginPath(); ctx.moveTo(0,AXIS_Y); ctx.lineTo(W,AXIS_Y); ctx.stroke();
 
   layout.forEach(({ item, year, slotIdx, noDate }) => {
-    const idx = noDate ? noDates.findIndex(l=>l.item===item) : -1;
-    const x = noDate ? 22+idx*14 : yearToX(year);
+    if (noDate) return; // undated items have no timeline position — shown in Table view
+    const x = yearToX(year);
     const y = slotY(slotIdx);
     const isHov = hovered===item, isSel = selected===item;
     const r = isHov||isSel ? DOT_R+2 : DOT_R;
@@ -610,7 +610,6 @@ function render() {
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
     ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
 
-    // Manual edit indicator — small dot
     if (item.hasManual) {
       ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
       ctx.fillStyle='#f43f5e'; ctx.fill();
@@ -625,18 +624,17 @@ function render() {
   });
 
   if (noDates.length) {
-    ctx.font='9px monospace'; ctx.fillStyle='#2e3455'; ctx.textAlign='left';
-    ctx.fillText('NO DATE', 4, H-7);
+    ctx.font='10px monospace'; ctx.fillStyle='#3a4060'; ctx.textAlign='left';
+    ctx.fillText(`${noDates.length} undated — see Table view`, 8, H-10);
   }
 }
 
 function hitTest(mx, my) {
   const layout = computeLayout(filtItems);
-  const noDates = layout.filter(l=>l.noDate);
   let best=null, bestD=14;
   layout.forEach(({ item, year, slotIdx, noDate }) => {
-    const idx = noDate ? noDates.findIndex(l=>l.item===item) : -1;
-    const x = noDate ? 22+idx*14 : yearToX(year);
+    if (noDate) return;
+    const x = yearToX(year);
     const y = slotY(slotIdx);
     const d = Math.hypot(mx-x, my-y);
     if (d<bestD) { bestD=d; best=item; }
