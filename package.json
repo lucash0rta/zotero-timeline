@@ -1,0 +1,12 @@
+{
+  "name": "zotero-timeline",
+  "version": "1.0.0",
+  "description": "Local timeline viewer for Zotero WebDAV library",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  }
+}
