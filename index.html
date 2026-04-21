@@ -267,7 +267,8 @@ let sortCol = 'year', sortDir = 1;
 
 const canvas = document.getElementById('tl');
 const ctx = canvas.getContext('2d');
-const AXIS_Y = 90, DOT_R = 6, GAP = 15, BASE = 60;
+const DOT_R = 6, GAP = 22, BASE = 60;
+let AXIS_Y = 120;
 
 // ── SCAN ───────────────────────────────────────────────────────
 async function checkExisting() {
@@ -552,7 +553,6 @@ function computeLayout(items) {
 function render() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
-  ctx.clearRect(0,0,W,H);
 
   if (!filtItems.length) {
     ctx.fillStyle='#000'; ctx.font='12px Verdana,Arial,sans-serif'; ctx.textAlign='center';
@@ -566,16 +566,29 @@ function render() {
   const step = pxPerY<10?50:pxPerY<20?20:pxPerY<40?10:pxPerY<80?5:pxPerY<160?2:1;
   const first = Math.ceil(y0/step)*step;
 
-  ctx.strokeStyle='rgba(0,0,0,0.15)'; ctx.lineWidth=1;
+  // faint vertical grid lines
+  ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=1;
   for (let yr=first; yr<=y1; yr+=step) {
     const x = Math.round(yearToX(yr));
     ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-    ctx.fillStyle='#000'; ctx.font='9px Verdana,Arial,sans-serif'; ctx.textAlign='center';
-    ctx.fillText(yr, x, H-8);
   }
 
-  ctx.strokeStyle='#000'; ctx.lineWidth=1.5;
+  // axis line
+  ctx.strokeStyle='#000'; ctx.lineWidth=2;
   ctx.beginPath(); ctx.moveTo(0,AXIS_Y); ctx.lineTo(W,AXIS_Y); ctx.stroke();
+
+  // tick marks + year labels on axis
+  for (let yr=first; yr<=y1; yr+=step) {
+    const x = Math.round(yearToX(yr));
+    const isMajor = yr % 10 === 0;
+    const tickH = isMajor ? 10 : 5;
+    ctx.strokeStyle='#000'; ctx.lineWidth = isMajor ? 2 : 1;
+    ctx.beginPath(); ctx.moveTo(x, AXIS_Y - tickH); ctx.lineTo(x, AXIS_Y + tickH); ctx.stroke();
+    ctx.fillStyle='#000';
+    ctx.font = isMajor ? 'bold 11px Verdana,Arial,sans-serif' : '9px Verdana,Arial,sans-serif';
+    ctx.textAlign='center';
+    ctx.fillText(yr, x, AXIS_Y + tickH + 13);
+  }
 
   layout.forEach(({ item, year, slotIdx, noDate }) => {
     if (noDate) return; // undated items have no timeline position — shown in Table view
@@ -597,6 +610,7 @@ function render() {
     }
     ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
     ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
+    ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.stroke();
 
     if (item.hasManual) {
       ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
@@ -651,7 +665,9 @@ function updateStats() {
 
 function resizeCanvas() {
   const w = document.getElementById('canvas-wrap');
-  canvas.width=w.clientWidth; canvas.height=w.clientHeight; render();
+  canvas.width=w.clientWidth; canvas.height=w.clientHeight;
+  AXIS_Y = Math.round(canvas.height * 0.32);
+  render();
 }
 
 // ── CANVAS EVENTS ──────────────────────────────────────────────
