@@ -21,9 +21,9 @@
     /* panels that need a background to be readable */
     #scan-overlay, #topbar, #filterbar, #statsbar, #detail,
     thead th, #enrich-box, #scan-box {
-      background: rgba(193,186,134,0.92);
+      background: transparent;
     }
-    #table-wrap { background: rgba(193,186,134,0.85); }
+    #table-wrap { background: transparent; }
 
     #scan-overlay { position:fixed; inset:0; z-index:200;
                     display:flex; align-items:center; justify-content:center; flex-direction:column; }
@@ -69,11 +69,11 @@
     #canvas-wrap { flex:1; position:relative; overflow:hidden; }
     #tl { display:block; cursor:crosshair; } #tl:active { cursor:grabbing; }
     #zoom-btns { position:absolute; bottom:12px; right:12px; display:flex; gap:3px; }
-    .zb { background:rgba(193,186,134,0.9); border:1px solid #000; color:#000;
+    .zb { background:transparent; border:1px solid #000; color:#000;
           cursor:pointer; font-family:inherit; font-size:15px; line-height:1; padding:3px 9px; }
     .zb:hover { background:#000; color:#fff; } .zb.sm { font-size:11px; font-weight:bold; padding:4px 9px; }
     #hint { position:absolute; bottom:12px; left:12px; font-size:10px; color:#000; pointer-events:none;
-            background:rgba(193,186,134,0.7); padding:2px 6px; }
+            padding:2px 6px; }
 
     #table-wrap { flex:1; overflow:auto; display:none; }
     #table-wrap.show { display:block; }
@@ -98,7 +98,7 @@
                 cursor:pointer; font-family:inherit; font-size:10px; padding:1px 6px; }
     .edit-btn:hover { background:#000; color:#fff; }
 
-    #detail { width:0; overflow:hidden; transition:width .2s; background:rgba(193,186,134,0.95);
+    #detail { width:0; overflow:hidden; transition:width .2s; background:transparent;
               border-left:1px solid #000; flex-shrink:0; display:flex; flex-direction:column; position:relative; }
     #detail.open { width:320px; }
     #di { padding:12px; overflow-y:auto; flex:1; }
@@ -552,7 +552,7 @@ function computeLayout(items) {
 function render() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
-  ctx.fillStyle = 'rgba(193,186,134,0.55)'; ctx.fillRect(0,0,W,H);
+  ctx.clearRect(0,0,W,H);
 
   if (!filtItems.length) {
     ctx.fillStyle='#000'; ctx.font='12px Verdana,Arial,sans-serif'; ctx.textAlign='center';
