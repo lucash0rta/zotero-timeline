@@ -7,246 +7,163 @@
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
-      --bg:      #0f1117;
-      --surf:    #1a1d27;
-      --surf2:   #22263a;
-      --border:  #2e3250;
-      --text:    #e2e4f0;
-      --dim:     #7a7f9a;
-      --accent:  #6c8bef;
-      --green:   #34d399;
-      --red:     #f43f5e;
+      --bg:     #0f1117; --surf:  #1a1d27; --surf2: #22263a;
+      --border: #2e3250; --text:  #e2e4f0; --dim:   #7a7f9a;
+      --accent: #6c8bef; --green: #34d399; --red:   #f43f5e;
+      --amber:  #f59e0b; --purple:#a78bfa;
     }
+    body { background:var(--bg); color:var(--text); font-family:'SF Mono','Fira Code',ui-monospace,monospace;
+           font-size:13px; height:100vh; display:flex; flex-direction:column; overflow:hidden; }
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: 'SF Mono', 'Fira Code', ui-monospace, monospace;
-      font-size: 13px;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-    }
+    /* ── SCAN OVERLAY ─── */
+    #scan-overlay { position:fixed; inset:0; background:var(--bg); z-index:200;
+                    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:20px; }
+    #scan-overlay.hidden { display:none; }
+    #scan-box { width:min(480px,90vw); background:var(--surf); border:1px solid var(--border);
+                border-radius:12px; padding:32px 36px; }
+    #scan-box h2 { font-size:16px; color:var(--accent); margin-bottom:6px; letter-spacing:.06em; }
+    #scan-sub    { font-size:11px; color:var(--dim); margin-bottom:24px; }
+    #pb-wrap { background:var(--surf2); border-radius:6px; height:6px; overflow:hidden; margin-bottom:10px; }
+    #pb      { height:100%; background:var(--accent); width:0%; transition:width .3s; border-radius:6px; }
+    #pb-text { font-size:11px; color:var(--dim); margin-bottom:20px; }
+    .scan-btn { width:100%; background:var(--accent); border:none; border-radius:6px; color:#fff;
+                cursor:pointer; font-family:inherit; font-size:13px; font-weight:700; padding:10px;
+                transition:opacity .15s; }
+    .scan-btn:hover { opacity:.87; } .scan-btn:disabled { opacity:.4; cursor:default; }
+    .scan-btn.sec { background:var(--surf2); border:1px solid var(--border); color:var(--dim); margin-top:8px; }
+    #scan-err { font-size:11px; color:var(--red); margin-top:10px; }
 
-    /* ── TYPE COLORS ─────────────────────── */
-    :root {
-      --c-PDF:          #6c8bef;
-      --c-Ebook:        #f59e0b;
-      --c-Webpage:      #22d3ee;
-      --c-Audio:        #a78bfa;
-      --c-Video:        #f43f5e;
-      --c-Document:     #94a3b8;
-      --c-Presentation: #4ade80;
-      --c-Text:         #facc15;
-      --c-Image:        #fb923c;
-      --c-File:         #64748b;
-    }
+    /* ── TOP BAR ─── */
+    #topbar { display:flex; align-items:center; gap:8px; padding:8px 14px;
+              background:var(--surf); border-bottom:1px solid var(--border); flex-shrink:0; flex-wrap:wrap; }
+    #topbar h1 { font-size:13px; font-weight:700; color:var(--accent); letter-spacing:.08em; }
+    #lib-info  { font-size:11px; color:var(--dim); }
+    .tbtn { background:var(--surf2); border:1px solid var(--border); border-radius:5px; color:var(--dim);
+            cursor:pointer; font-family:inherit; font-size:11px; font-weight:600; padding:4px 10px;
+            transition:color .15s,border-color .15s; white-space:nowrap; }
+    .tbtn:hover { color:var(--text); } .tbtn.active { color:var(--accent); border-color:var(--accent); }
+    #top-right { margin-left:auto; display:flex; gap:6px; align-items:center; }
+    .view-toggle { display:flex; border:1px solid var(--border); border-radius:5px; overflow:hidden; }
+    .view-toggle button { background:var(--surf2); border:none; color:var(--dim); cursor:pointer;
+                          font-family:inherit; font-size:11px; font-weight:600; padding:4px 12px; transition:all .15s; }
+    .view-toggle button.active { background:var(--accent); color:#fff; }
 
-    /* ── SCAN OVERLAY ────────────────────── */
-    #scan-overlay {
-      position: fixed; inset: 0;
-      background: var(--bg);
-      z-index: 200;
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 20px;
-    }
-    #scan-overlay.hidden { display: none; }
+    /* ── FILTER BAR ─── */
+    #filterbar { display:flex; align-items:center; gap:6px; padding:6px 14px;
+                 background:var(--surf); border-bottom:1px solid var(--border); flex-shrink:0; overflow-x:auto; }
+    .fl { color:var(--dim); font-size:10px; font-weight:700; letter-spacing:.06em; white-space:nowrap; }
+    .chip { border-radius:4px; cursor:pointer; font-size:10px; font-weight:700; padding:2px 8px;
+            border:1px solid transparent; transition:opacity .15s; white-space:nowrap; user-select:none; }
+    .chip.off { opacity:.22; }
+    #search-inp { margin-left:auto; flex-shrink:0; width:170px; background:var(--surf2);
+                  border:1px solid var(--border); border-radius:5px; color:var(--text);
+                  font-family:inherit; font-size:11px; padding:4px 9px; outline:none; }
+    #search-inp:focus { border-color:var(--accent); }
 
-    #scan-box {
-      width: min(480px, 90vw);
-      background: var(--surf);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px 36px;
-    }
-    #scan-box h2 { font-size: 16px; color: var(--accent); margin-bottom: 6px; letter-spacing: .06em; }
-    #scan-sub    { font-size: 11px; color: var(--dim); margin-bottom: 24px; }
+    /* ── MAIN ─── */
+    #main { display:flex; flex:1; overflow:hidden; }
 
-    #progress-bar-wrap {
-      background: var(--surf2);
-      border-radius: 6px;
-      height: 6px;
-      overflow: hidden;
-      margin-bottom: 10px;
-    }
-    #progress-bar {
-      height: 100%;
-      background: var(--accent);
-      width: 0%;
-      transition: width .3s;
-      border-radius: 6px;
-    }
-    #progress-text { font-size: 11px; color: var(--dim); margin-bottom: 20px; }
+    /* ── TIMELINE ─── */
+    #canvas-wrap { flex:1; position:relative; overflow:hidden; }
+    #tl { display:block; cursor:grab; } #tl:active { cursor:grabbing; }
+    #zoom-btns { position:absolute; bottom:14px; right:14px; display:flex; gap:5px; }
+    .zb { background:var(--surf); border:1px solid var(--border); border-radius:5px; color:var(--text);
+          cursor:pointer; font-family:inherit; font-size:16px; line-height:1; padding:4px 10px; transition:border-color .15s; }
+    .zb:hover { border-color:var(--accent); } .zb.sm { font-size:11px; font-weight:700; }
+    #hint { position:absolute; bottom:14px; left:14px; font-size:10px; color:var(--dim); pointer-events:none; }
 
-    .scan-btn {
-      width: 100%;
-      background: var(--accent);
-      border: none; border-radius: 6px;
-      color: #fff; cursor: pointer;
-      font-family: inherit; font-size: 13px; font-weight: 700;
-      padding: 10px; transition: opacity .15s;
-    }
-    .scan-btn:hover { opacity: .87; }
-    .scan-btn:disabled { opacity: .4; cursor: default; }
-    .scan-btn.secondary {
-      background: var(--surf2);
-      border: 1px solid var(--border);
-      color: var(--dim);
-      margin-top: 8px;
-    }
+    /* ── TABLE VIEW ─── */
+    #table-wrap { flex:1; overflow:auto; display:none; }
+    #table-wrap.show { display:block; }
+    #canvas-wrap.hide { display:none; }
+    table { width:100%; border-collapse:collapse; font-size:12px; }
+    thead th { background:var(--surf); border-bottom:1px solid var(--border); padding:8px 12px;
+               text-align:left; font-size:10px; font-weight:700; letter-spacing:.06em; color:var(--dim);
+               cursor:pointer; white-space:nowrap; position:sticky; top:0; z-index:1; user-select:none; }
+    thead th:hover { color:var(--text); }
+    thead th.sorted { color:var(--accent); }
+    tbody tr { border-bottom:1px solid var(--border); transition:background .1s; }
+    tbody tr:hover { background:var(--surf2); }
+    tbody td { padding:7px 12px; vertical-align:middle; }
+    .t-type { font-size:10px; font-weight:700; border-radius:3px; padding:2px 6px; white-space:nowrap; }
+    .t-year { white-space:nowrap; }
+    .t-title { max-width:280px; }
+    .t-title-text { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; display:block; max-width:280px; cursor:pointer; }
+    .t-title-text:hover { color:var(--accent); }
+    .t-authors { max-width:160px; color:var(--dim); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .src-badge { display:inline-block; border-radius:3px; font-size:9px; font-weight:700;
+                 padding:1px 5px; margin-left:4px; vertical-align:middle; }
+    .src-crossref   { background:#6c8bef22; color:#6c8bef; }
+    .src-openlibrary{ background:#34d39922; color:#34d399; }
+    .src-claude     { background:#a78bfa22; color:#a78bfa; }
+    .src-filename   { background:#f59e0b22; color:#f59e0b; }
+    .src-fallback   { background:#64748b22; color:#64748b; }
+    .src-manual     { background:#f43f5e22; color:#f43f5e; }
+    .src-html       { background:#22d3ee22; color:#22d3ee; }
+    .edit-btn { background:none; border:1px solid var(--border); border-radius:3px; color:var(--dim);
+                cursor:pointer; font-family:inherit; font-size:10px; padding:2px 7px; transition:color .15s; }
+    .edit-btn:hover { color:var(--accent); border-color:var(--accent); }
 
-    #scan-error { font-size: 11px; color: var(--red); margin-top: 10px; }
+    /* ── DETAIL PANEL ─── */
+    #detail { width:0; overflow:hidden; transition:width .22s; background:var(--surf);
+              border-left:1px solid var(--border); flex-shrink:0; display:flex; flex-direction:column; position:relative; }
+    #detail.open { width:340px; }
+    #di { padding:16px; overflow-y:auto; flex:1; }
+    #dc { position:absolute; top:8px; right:10px; background:none; border:none; color:var(--dim);
+          font-size:18px; cursor:pointer; line-height:1; }
+    #dc:hover { color:var(--text); }
+    .d-badge { display:inline-block; border-radius:4px; font-size:10px; font-weight:700; padding:2px 8px; margin-bottom:8px; }
+    #d-title { font-size:13px; font-weight:700; line-height:1.45; margin-bottom:10px; }
+    .mr { display:flex; gap:8px; margin-bottom:6px; font-size:11px; }
+    .mk { color:var(--dim); min-width:72px; flex-shrink:0; }
+    .mv { color:var(--text); flex:1; word-break:break-word; }
+    #d-desc { font-size:11px; color:var(--dim); line-height:1.65; border-top:1px solid var(--border);
+              margin-top:12px; padding-top:12px; }
+    #d-edit-form { border-top:1px solid var(--border); margin-top:14px; padding-top:14px; }
+    #d-edit-form h4 { font-size:10px; font-weight:700; letter-spacing:.07em; color:var(--dim); margin-bottom:10px; text-transform:uppercase; }
+    .ef-field { margin-bottom:10px; }
+    .ef-field label { display:block; font-size:10px; color:var(--dim); margin-bottom:3px; }
+    .ef-field input, .ef-field textarea {
+      width:100%; background:var(--surf2); border:1px solid var(--border); border-radius:5px;
+      color:var(--text); font-family:inherit; font-size:11px; padding:5px 8px; outline:none; }
+    .ef-field input:focus, .ef-field textarea:focus { border-color:var(--accent); }
+    .ef-btns { display:flex; gap:6px; margin-top:10px; }
+    .ef-btns button { flex:1; border:none; border-radius:5px; cursor:pointer; font-family:inherit;
+                      font-size:11px; font-weight:700; padding:7px; transition:opacity .15s; }
+    .ef-save  { background:var(--accent); color:#fff; }
+    .ef-clear { background:var(--surf2); border:1px solid var(--border)!important; color:var(--dim); }
+    .ef-btns button:hover { opacity:.85; }
 
-    /* ── TOP BAR ──────────────────────────── */
-    #topbar {
-      display: flex; align-items: center; gap: 10px;
-      padding: 8px 14px;
-      background: var(--surf); border-bottom: 1px solid var(--border);
-      flex-shrink: 0;
-    }
-    #topbar h1 { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .08em; }
-    #lib-info  { font-size: 11px; color: var(--dim); }
+    /* ── ENRICH MODAL ─── */
+    #enrich-modal { display:none; position:fixed; inset:0; background:rgba(15,17,23,.88); z-index:150;
+                    align-items:center; justify-content:center; }
+    #enrich-modal.show { display:flex; }
+    #enrich-box { background:var(--surf); border:1px solid var(--border); border-radius:12px;
+                  padding:28px 32px; width:min(480px,92vw); }
+    #enrich-box h3 { font-size:14px; color:var(--accent); margin-bottom:6px; }
+    #enrich-box p  { font-size:11px; color:var(--dim); margin-bottom:16px; line-height:1.65; }
+    .ef2 label { display:block; font-size:10px; font-weight:700; letter-spacing:.07em; color:var(--dim); text-transform:uppercase; margin-bottom:5px; }
+    .ef2 input { width:100%; background:var(--surf2); border:1px solid var(--border); border-radius:6px;
+                 color:var(--text); font-family:inherit; font-size:12px; padding:7px 10px; outline:none; margin-bottom:14px; }
+    .ef2 input:focus { border-color:var(--accent); }
+    #ep-wrap { background:var(--surf2); border-radius:5px; height:5px; overflow:hidden; margin-bottom:8px; display:none; }
+    #ep { height:100%; background:var(--accent); width:0%; transition:width .3s; border-radius:5px; }
+    #e-status { font-size:11px; color:var(--dim); margin-bottom:14px; }
+    #e-error  { font-size:11px; color:var(--red); min-height:16px; }
+    .e-btns { display:flex; gap:8px; }
+    .e-btns button { flex:1; background:var(--accent); border:none; border-radius:6px; color:#fff;
+                     cursor:pointer; font-family:inherit; font-size:12px; font-weight:700; padding:9px; }
+    .e-btns button:hover { opacity:.87; } .e-btns button:disabled { opacity:.4; cursor:default; }
+    .e-btns button.cancel { background:var(--surf2); border:1px solid var(--border); color:var(--dim); }
 
-    .top-btn {
-      background: var(--surf2); border: 1px solid var(--border);
-      border-radius: 5px; color: var(--dim); cursor: pointer;
-      font-family: inherit; font-size: 11px; font-weight: 600;
-      padding: 4px 10px; transition: color .15s; white-space: nowrap;
-    }
-    .top-btn:hover { color: var(--text); }
-    #top-right { margin-left: auto; display: flex; gap: 6px; }
+    /* ── STATS ─── */
+    #statsbar { padding:5px 14px; font-size:10px; color:var(--dim); border-top:1px solid var(--border);
+                background:var(--surf); flex-shrink:0; display:flex; gap:18px; flex-wrap:wrap; }
+    .stat span { color:var(--text); font-weight:700; }
 
-    /* ── FILTER BAR ───────────────────────── */
-    #filterbar {
-      display: flex; align-items: center; gap: 6px;
-      padding: 6px 14px;
-      background: var(--surf); border-bottom: 1px solid var(--border);
-      flex-shrink: 0; overflow-x: auto;
-    }
-    .fl { color: var(--dim); font-size: 10px; font-weight: 700; letter-spacing: .06em; white-space: nowrap; }
-    .chip {
-      border-radius: 4px; cursor: pointer;
-      font-size: 10px; font-weight: 700;
-      padding: 2px 8px; border: 1px solid transparent;
-      transition: opacity .15s; white-space: nowrap; user-select: none;
-    }
-    .chip.off { opacity: .22; }
-    #search-inp {
-      margin-left: auto; flex-shrink: 0; width: 165px;
-      background: var(--surf2); border: 1px solid var(--border);
-      border-radius: 5px; color: var(--text);
-      font-family: inherit; font-size: 11px; padding: 4px 9px; outline: none;
-    }
-    #search-inp:focus { border-color: var(--accent); }
-
-    /* ── MAIN ────────────────────────────── */
-    #main { display: flex; flex: 1; overflow: hidden; }
-
-    #canvas-wrap { flex: 1; position: relative; overflow: hidden; }
-    #tl { display: block; cursor: grab; }
-    #tl:active { cursor: grabbing; }
-
-    #zoom-btns {
-      position: absolute; bottom: 14px; right: 14px;
-      display: flex; gap: 5px;
-    }
-    .zb {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: 5px; color: var(--text); cursor: pointer;
-      font-family: inherit; font-size: 16px; line-height: 1;
-      padding: 4px 10px; transition: border-color .15s;
-    }
-    .zb:hover { border-color: var(--accent); }
-    .zb.sm { font-size: 11px; font-weight: 700; }
-
-    #hint {
-      position: absolute; bottom: 14px; left: 14px;
-      font-size: 10px; color: var(--dim); pointer-events: none;
-    }
-
-    /* ── DETAIL PANEL ────────────────────── */
-    #detail {
-      width: 0; overflow: hidden;
-      transition: width .22s; background: var(--surf);
-      border-left: 1px solid var(--border);
-      flex-shrink: 0; display: flex; flex-direction: column; position: relative;
-    }
-    #detail.open { width: 310px; }
-    #di { padding: 14px; overflow-y: auto; flex: 1; }
-    #dc {
-      position: absolute; top: 8px; right: 10px;
-      background: none; border: none; color: var(--dim);
-      font-size: 18px; cursor: pointer; line-height: 1;
-    }
-    #dc:hover { color: var(--text); }
-    .d-badge {
-      display: inline-block; border-radius: 4px;
-      font-size: 10px; font-weight: 700;
-      padding: 2px 8px; margin-bottom: 8px;
-    }
-    #d-title { font-size: 12px; font-weight: 700; line-height: 1.45; margin-bottom: 10px; }
-    .mr { display: flex; gap: 8px; margin-bottom: 5px; font-size: 11px; }
-    .mk { color: var(--dim); min-width: 65px; }
-    .mv { color: var(--text); flex: 1; word-break: break-word; }
-    .src-badge {
-      display: inline-block; border-radius: 3px;
-      font-size: 9px; font-weight: 700; padding: 1px 5px; margin-left: 5px;
-      vertical-align: middle;
-    }
-    .src-crossref  { background: #6c8bef22; color: #6c8bef; }
-    .src-openlibrary { background: #34d39922; color: #34d399; }
-    .src-claude    { background: #a78bfa22; color: #a78bfa; }
-    .src-filename  { background: #f59e0b22; color: #f59e0b; }
-    .src-fallback  { background: #64748b22; color: #64748b; }
-    .conf-low      { opacity: .6; }
-
-    /* ── ENRICH MODAL ─────────────────────── */
-    #enrich-modal {
-      display: none; position: fixed; inset: 0;
-      background: rgba(15,17,23,.88); z-index: 150;
-      align-items: center; justify-content: center;
-    }
-    #enrich-modal.show { display: flex; }
-    #enrich-box {
-      background: var(--surf); border: 1px solid var(--border);
-      border-radius: 12px; padding: 28px 32px;
-      width: min(480px, 92vw);
-    }
-    #enrich-box h3 { font-size: 14px; color: var(--accent); margin-bottom: 6px; }
-    #enrich-box p  { font-size: 11px; color: var(--dim); margin-bottom: 16px; line-height: 1.6; }
-    .enrich-field label { display: block; font-size: 10px; font-weight: 700; letter-spacing: .07em; color: var(--dim); text-transform: uppercase; margin-bottom: 5px; }
-    .enrich-field input {
-      width: 100%; background: var(--surf2); border: 1px solid var(--border);
-      border-radius: 6px; color: var(--text); font-family: inherit; font-size: 12px;
-      padding: 7px 10px; outline: none; margin-bottom: 14px;
-    }
-    .enrich-field input:focus { border-color: var(--accent); }
-    #enrich-prog-wrap { background: var(--surf2); border-radius: 5px; height: 5px; overflow: hidden; margin-bottom: 8px; display: none; }
-    #enrich-prog { height: 100%; background: var(--accent); width: 0%; transition: width .3s; border-radius: 5px; }
-    #enrich-status { font-size: 11px; color: var(--dim); margin-bottom: 14px; }
-    #enrich-error  { font-size: 11px; color: var(--red); min-height: 16px; }
-    .enrich-btns   { display: flex; gap: 8px; }
-    .enrich-btns button { flex: 1; background: var(--accent); border: none; border-radius: 6px; color: #fff; cursor: pointer; font-family: inherit; font-size: 12px; font-weight: 700; padding: 9px; transition: opacity .15s; }
-    .enrich-btns button:hover { opacity: .87; }
-    .enrich-btns button:disabled { opacity: .4; cursor: default; }
-    .enrich-btns button.cancel { background: var(--surf2); border: 1px solid var(--border); color: var(--dim); }
-
-    /* ── STATS ───────────────────────────── */
-    #statsbar {
-      padding: 5px 14px; font-size: 10px; color: var(--dim);
-      border-top: 1px solid var(--border); background: var(--surf);
-      flex-shrink: 0; display: flex; gap: 18px; flex-wrap: wrap;
-    }
-    .stat span { color: var(--text); font-weight: 700; }
-
-    /* ── SPINNER ─────────────────────────── */
-    .spinner {
-      width: 24px; height: 24px;
-      border: 3px solid var(--border); border-top-color: var(--accent);
-      border-radius: 50%; animation: spin .7s linear infinite;
-    }
-    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width:24px; height:24px; border:3px solid var(--border); border-top-color:var(--accent);
+               border-radius:50%; animation:spin .7s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
   </style>
 </head>
 <body>
@@ -256,21 +173,11 @@
   <div id="scan-box">
     <h2>◈ ZOTERO TIMELINE</h2>
     <p id="scan-sub">Scanning your WebDAV library…</p>
-    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
-    <p id="progress-text">Connecting to server…</p>
+    <div id="pb-wrap"><div id="pb"></div></div>
+    <p id="pb-text">Connecting to server…</p>
     <button class="scan-btn" id="btn-rescan" style="display:none">Scan Library</button>
-    <button class="scan-btn secondary" id="btn-use-cache" style="display:none">Use Cached Data</button>
-    <p id="scan-error"></p>
-  </div>
-</div>
-
-<!-- App -->
-<div id="topbar">
-  <h1>◈ ZOTERO TIMELINE</h1>
-  <span id="lib-info"></span>
-  <div id="top-right">
-    <button class="top-btn" id="btn-enrich">enrich dates</button>
-    <button class="top-btn" id="btn-refresh">refresh library</button>
+    <button class="scan-btn sec" id="btn-cache" style="display:none">Use Existing Data</button>
+    <p id="scan-err"></p>
   </div>
 </div>
 
@@ -278,19 +185,32 @@
 <div id="enrich-modal">
   <div id="enrich-box">
     <h3>◈ Enrich Publication Dates</h3>
-    <p>Looks up original publication dates via <strong style="color:var(--text)">CrossRef</strong> and <strong style="color:var(--text)">OpenLibrary</strong> (free, no key needed).<br>
-    Optionally provide a <strong style="color:var(--text)">Claude API key</strong> to use AI as a fallback for anything those APIs can't resolve.</p>
-    <div class="enrich-field">
+    <p>Queries <strong style="color:var(--text)">CrossRef</strong> + <strong style="color:var(--text)">OpenLibrary</strong> (free) to find original publication dates. Optionally add a <strong style="color:var(--text)">Claude API key</strong> to use AI for anything those APIs miss.</p>
+    <div class="ef2">
       <label>Claude API Key (optional)</label>
-      <input type="password" id="claude-key-inp" placeholder="sk-ant-… (leave blank to skip AI step)" />
+      <input type="password" id="claude-key-inp" placeholder="sk-ant-… leave blank to skip AI" />
     </div>
-    <div id="enrich-prog-wrap"><div id="enrich-prog"></div></div>
-    <div id="enrich-status">Ready.</div>
-    <div id="enrich-error"></div>
-    <div class="enrich-btns">
+    <div id="ep-wrap"><div id="ep"></div></div>
+    <div id="e-status">Ready.</div>
+    <div id="e-error"></div>
+    <div class="e-btns">
       <button id="btn-run-enrich">Run Enrichment</button>
       <button class="cancel" id="btn-close-enrich">Cancel</button>
     </div>
+  </div>
+</div>
+
+<!-- App shell -->
+<div id="topbar">
+  <h1>◈ ZOTERO TIMELINE</h1>
+  <span id="lib-info"></span>
+  <div id="top-right">
+    <div class="view-toggle">
+      <button id="btn-view-tl" class="active" onclick="setView('timeline')">Timeline</button>
+      <button id="btn-view-tb" onclick="setView('table')">Table</button>
+    </div>
+    <button class="tbtn" id="btn-enrich">enrich dates</button>
+    <button class="tbtn" id="btn-refresh">rescan library</button>
   </div>
 </div>
 
@@ -301,6 +221,7 @@
 </div>
 
 <div id="main">
+  <!-- Timeline -->
   <div id="canvas-wrap">
     <canvas id="tl"></canvas>
     <div id="zoom-btns">
@@ -310,6 +231,25 @@
     </div>
     <div id="hint">scroll to zoom · drag to pan · click dot to inspect</div>
   </div>
+
+  <!-- Table -->
+  <div id="table-wrap">
+    <table id="tbl">
+      <thead>
+        <tr>
+          <th data-col="type">Type</th>
+          <th data-col="year">Year ↕</th>
+          <th data-col="title">Title</th>
+          <th data-col="authors">Authors</th>
+          <th data-col="source">Source</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tbl-body"></tbody>
+    </table>
+  </div>
+
+  <!-- Detail panel -->
   <div id="detail">
     <button id="dc">×</button>
     <div id="di"></div>
@@ -321,210 +261,288 @@
   <div class="stat">With year: <span id="sy">—</span></div>
   <div class="stat">Range: <span id="sr">—</span></div>
   <div class="stat">Types: <span id="stp">—</span></div>
+  <div class="stat">Enriched: <span id="se">—</span></div>
 </div>
 
 <script>
-const API = '';
-
-// ── TYPE → COLOR ────────────────────────────────────────────
-const TC = {
-  PDF: '#6c8bef', Ebook: '#f59e0b', Webpage: '#22d3ee',
-  Audio: '#a78bfa', Video: '#f43f5e', Document: '#94a3b8',
-  Presentation: '#4ade80', Text: '#facc15', Image: '#fb923c', File: '#64748b',
-};
+const TC = { PDF:'#6c8bef', Ebook:'#f59e0b', Webpage:'#22d3ee', Audio:'#a78bfa',
+             Video:'#f43f5e', Document:'#94a3b8', Presentation:'#4ade80',
+             Text:'#facc15', Image:'#fb923c', File:'#64748b' };
 const tc = t => TC[t] || '#64748b';
 
-// ── STATE ───────────────────────────────────────────────────
+// ── STATE ──────────────────────────────────────────────────────
 let allItems = [], filtItems = [], activeTypes = new Set(), q = '';
-let enriched = {};   // key → { year, source, confidence, note }
 let camX = 0, zoom = 1, isDrag = false, dragX0 = 0, camX0 = 0;
 let hovered = null, selected = null;
+let currentView = 'timeline';
+let sortCol = 'year', sortDir = 1;
 
 const canvas = document.getElementById('tl');
 const ctx = canvas.getContext('2d');
 const AXIS_Y = 90, DOT_R = 6, GAP = 15, BASE = 60;
 
-// ── SCAN ────────────────────────────────────────────────────
-async function checkCache() {
-  const res = await fetch(`${API}/api/items`).catch(() => null);
-  if (res?.ok) {
-    const data = await res.json();
-    if (Array.isArray(data) && data.length > 0) return data;
-  }
+// ── SCAN ───────────────────────────────────────────────────────
+async function checkExisting() {
+  const res = await fetch('/api/items').catch(() => null);
+  if (res?.ok) { const d = await res.json(); if (Array.isArray(d) && d.length) return d; }
   return null;
 }
 
 async function runScan() {
   document.getElementById('btn-rescan').style.display = 'none';
-  document.getElementById('btn-use-cache').style.display = 'none';
-  document.getElementById('scan-error').textContent = '';
-  document.getElementById('scan-sub').textContent = 'Scanning your WebDAV library…';
+  document.getElementById('btn-cache').style.display  = 'none';
+  document.getElementById('scan-err').textContent = '';
   setProgress(0, 'Connecting…');
 
   return new Promise((resolve, reject) => {
-    const es = new EventSource(`${API}/api/scan`);
-
+    const es = new EventSource('/api/scan');
     es.addEventListener('progress', e => {
       const d = JSON.parse(e.data);
-      if (d.stage === 'listing') {
-        setProgress(2, 'Listing WebDAV files…');
-      } else if (d.stage === 'scanning' && d.total > 0) {
-        const pct = Math.round((d.done / d.total) * 96) + 2;
-        setProgress(pct, `Reading file headers… ${d.done} / ${d.total}`);
-      }
+      const msg = d.stage === 'listing'  ? 'Listing WebDAV files…'
+                : d.stage === 'checking' ? `Checking for changes… ${d.done}/${d.total}`
+                : d.total === 0          ? `No changes — ${d.unchanged} items already up to date.`
+                : `Scanning ${d.done}/${d.total} new/updated items… (${d.unchanged||0} unchanged)`;
+      const pct = d.stage === 'listing' ? 2
+                : d.stage === 'checking' ? 2 + Math.round(d.done/d.total*40)
+                : 42 + (d.total > 0 ? Math.round(d.done/d.total*56) : 56);
+      setProgress(pct, msg);
     });
-
-    es.addEventListener('done', e => {
-      es.close();
-      setProgress(100, 'Done!');
-      resolve(JSON.parse(e.data));
-    });
-
+    es.addEventListener('done', e => { es.close(); setProgress(100,'Done!'); resolve(JSON.parse(e.data)); });
     es.addEventListener('error', e => {
       es.close();
-      try {
-        const d = JSON.parse(e.data);
-        reject(new Error(d.message));
-      } catch {
-        reject(new Error('Scan failed — is the server running? Run: npm start'));
-      }
+      try { reject(new Error(JSON.parse(e.data).message)); }
+      catch { reject(new Error('Scan failed — is the server running?')); }
     });
   });
 }
 
 function setProgress(pct, msg) {
-  document.getElementById('progress-bar').style.width = pct + '%';
-  document.getElementById('progress-text').textContent = msg;
+  document.getElementById('pb').style.width = pct + '%';
+  document.getElementById('pb-text').textContent = msg;
 }
 
-// ── INIT ────────────────────────────────────────────────────
 (async () => {
-  // Try to load cache first
-  const cached = await checkCache().catch(() => null);
-
-  if (cached) {
-    document.getElementById('scan-sub').textContent = `Found ${cached.length} cached items.`;
-    document.getElementById('btn-rescan').textContent = 'Re-scan Library';
+  const existing = await checkExisting().catch(() => null);
+  if (existing) {
+    document.getElementById('scan-sub').textContent = `Found ${existing.length} items in database.`;
+    document.getElementById('btn-cache').style.display  = 'block';
     document.getElementById('btn-rescan').style.display = 'block';
-    document.getElementById('btn-use-cache').style.display = 'block';
-    setProgress(100, 'Cached data available.');
-
-    document.getElementById('btn-use-cache').onclick = () => loadItems(cached);
+    document.getElementById('btn-cache').onclick  = () => loadItems(existing);
     document.getElementById('btn-rescan').onclick = doScan;
+    setProgress(100, 'Existing data available.');
   } else {
-    document.getElementById('scan-sub').textContent = 'No cache found. Starting scan…';
+    document.getElementById('scan-sub').textContent = 'No data yet. Starting first scan…';
     doScan();
   }
 })();
 
 async function doScan() {
+  document.getElementById('btn-rescan').disabled = true;
   try {
     const items = await runScan();
     loadItems(items);
   } catch(e) {
-    document.getElementById('scan-error').textContent = e.message;
-    document.getElementById('btn-rescan').textContent = 'Retry Scan';
+    document.getElementById('scan-err').textContent = e.message;
     document.getElementById('btn-rescan').style.display = 'block';
+    document.getElementById('btn-rescan').textContent = 'Retry';
+    document.getElementById('btn-rescan').disabled = false;
     document.getElementById('btn-rescan').onclick = doScan;
   }
 }
 
-async function loadItems(items) {
+function loadItems(items) {
   allItems = items;
   document.getElementById('scan-overlay').classList.add('hidden');
-  // Load any existing enrichment data
-  try {
-    const res = await fetch(`${API}/api/enriched`);
-    if (res.ok) enriched = await res.json();
-  } catch(_) {}
-  updateLibInfo();
   buildChips();
   applyFilters();
 }
 
 function updateLibInfo() {
-  const enrichedCount = Object.keys(enriched).length;
-  const dated = allItems.filter(i => i.year || enriched[i.key]?.year).length;
+  const enriched = allItems.filter(i => i.source && i.source !== 'filename' && i.source !== 'fallback').length;
+  const dated = allItems.filter(i => i.year != null).length;
   document.getElementById('lib-info').textContent =
-    `${allItems.length} items · ${dated} dated${enrichedCount ? ` · ${enrichedCount} enriched` : ''}`;
+    `${allItems.length} items · ${dated} dated · ${enriched} enriched`;
 }
 
-// ── FILTER & CHIPS ──────────────────────────────────────────
+// ── FILTERS ────────────────────────────────────────────────────
 function buildChips() {
   const counts = {};
-  allItems.forEach(i => { counts[i.type] = (counts[i.type] || 0) + 1; });
+  allItems.forEach(i => { counts[i.type] = (counts[i.type]||0) + 1; });
   activeTypes = new Set(Object.keys(counts));
-
   const box = document.getElementById('chips');
   box.innerHTML = '';
-
-  const all = mkChip(`ALL (${allItems.length})`, '#334155', '#e2e4f0');
-  all.onclick = () => { activeTypes = new Set(Object.keys(counts)); syncChips(); applyFilters(); };
-  box.appendChild(all);
-
-  Object.entries(counts).sort((a,b) => b[1]-a[1]).forEach(([type, n]) => {
+  const allChip = mkChip(`ALL (${allItems.length})`, '#334155', '#e2e4f0');
+  allChip.onclick = () => { activeTypes = new Set(Object.keys(counts)); syncChips(); applyFilters(); };
+  box.appendChild(allChip);
+  Object.entries(counts).sort((a,b)=>b[1]-a[1]).forEach(([type,n]) => {
     const c = mkChip(`${type} (${n})`, tc(type)+'33', tc(type));
-    c.dataset.type = type;
-    c.style.borderColor = tc(type);
+    c.dataset.type = type; c.style.borderColor = tc(type);
     c.onclick = () => { activeTypes.has(type) ? activeTypes.delete(type) : activeTypes.add(type); syncChips(); applyFilters(); };
     box.appendChild(c);
   });
   syncChips();
 }
-
-function mkChip(label, bg, color) {
-  const el = document.createElement('div');
-  el.className = 'chip';
-  el.style.background = bg; el.style.color = color;
-  el.textContent = label;
-  return el;
+function mkChip(l, bg, color) {
+  const el = document.createElement('div'); el.className = 'chip';
+  el.style.background = bg; el.style.color = color; el.textContent = l; return el;
 }
-
 function syncChips() {
-  document.querySelectorAll('.chip[data-type]').forEach(c => {
-    c.classList.toggle('off', !activeTypes.has(c.dataset.type));
-  });
+  document.querySelectorAll('.chip[data-type]').forEach(c => c.classList.toggle('off', !activeTypes.has(c.dataset.type)));
 }
-
 function applyFilters() {
   const lq = q.toLowerCase();
   filtItems = allItems.filter(i =>
-    activeTypes.has(i.type) &&
-    (!lq || i.title.toLowerCase().includes(lq) || i.authors.toLowerCase().includes(lq))
+    activeTypes.has(i.type) && (!lq || i.title.toLowerCase().includes(lq) || i.authors.toLowerCase().includes(lq))
   );
   updateStats();
-  fitView();
-  render();
+  updateLibInfo();
+  if (currentView === 'timeline') { fitView(); render(); }
+  else renderTable();
 }
 
-// ── LAYOUT ──────────────────────────────────────────────────
-function effectiveYear(item) {
-  // Priority: enriched year > filename year > mtime fallback
-  return enriched[item.key]?.year ?? item.year ?? item.yearFallback ?? null;
+// ── VIEW TOGGLE ────────────────────────────────────────────────
+function setView(v) {
+  currentView = v;
+  document.getElementById('canvas-wrap').classList.toggle('hide', v === 'table');
+  document.getElementById('table-wrap').classList.toggle('show', v === 'table');
+  document.getElementById('btn-view-tl').classList.toggle('active', v === 'timeline');
+  document.getElementById('btn-view-tb').classList.toggle('active', v === 'table');
+  if (v === 'timeline') { fitView(); render(); }
+  else renderTable();
 }
 
-function yearSource(item) {
-  if (enriched[item.key]?.year) return enriched[item.key].source;
-  if (item.year) return 'filename';
-  if (item.yearFallback) return 'fallback';
-  return null;
+// ── TABLE ──────────────────────────────────────────────────────
+function srcBadge(src, conf) {
+  if (!src) return '';
+  const cls = `src-${src}`;
+  const label = src === 'openlibrary' ? 'OL' : src === 'crossref' ? 'CR' :
+                src === 'claude' ? 'AI' : src === 'filename' ? 'file' :
+                src === 'fallback' ? 'date' : src === 'html' ? 'html' : src;
+  const dim = conf === 'low' ? ' style="opacity:.55"' : '';
+  return `<span class="src-badge ${cls}"${dim}>${label}</span>`;
 }
 
-function computeLayout(items) {
-  const byYear = {};
-  items.forEach(i => {
-    const y = effectiveYear(i) ?? '__none__';
-    (byYear[y] = byYear[y] || []).push(i);
+function renderTable() {
+  const sorted = [...filtItems].sort((a, b) => {
+    let av = a[sortCol] ?? '', bv = b[sortCol] ?? '';
+    if (sortCol === 'year') { av = av || 9999; bv = bv || 9999; }
+    return av < bv ? -sortDir : av > bv ? sortDir : 0;
   });
-  const layout = [];
-  Object.entries(byYear).forEach(([k, grp]) => {
-    grp.forEach((item, idx) => {
-      layout.push({ item, year: k === '__none__' ? null : +k, slotIdx: idx, noDate: k === '__none__' });
-    });
+
+  document.getElementById('tbl-body').innerHTML = sorted.map(item => {
+    const color = tc(item.type);
+    return `<tr data-key="${esc(item.key)}">
+      <td><span class="t-type" style="background:${color}22;color:${color}">${item.type}</span></td>
+      <td class="t-year">${item.year ?? '<span style="color:var(--dim)">—</span>'}${srcBadge(item.source, item.confidence)}</td>
+      <td class="t-title"><span class="t-title-text" title="${esc(item.title)}">${esc(item.title)}${item.hasManual ? ' <span style="color:var(--red);font-size:9px">✎</span>' : ''}</span></td>
+      <td class="t-authors">${esc(item.authors || '—')}</td>
+      <td>${srcBadge(item.source, item.confidence)}</td>
+      <td><button class="edit-btn" onclick="openDetail('${esc(item.key)}')">edit</button></td>
+    </tr>`;
+  }).join('');
+
+  // Row click → detail
+  document.querySelectorAll('#tbl-body tr').forEach(tr => {
+    tr.querySelector('.t-title-text').addEventListener('click', () => openDetail(tr.dataset.key));
   });
-  return layout;
+
+  // Sort headers
+  document.querySelectorAll('thead th[data-col]').forEach(th => {
+    th.classList.toggle('sorted', th.dataset.col === sortCol);
+    th.onclick = () => {
+      if (sortCol === th.dataset.col) sortDir *= -1;
+      else { sortCol = th.dataset.col; sortDir = 1; }
+      renderTable();
+    };
+  });
 }
 
+// ── DETAIL PANEL ──────────────────────────────────────────────
+async function openDetail(key) {
+  selected = allItems.find(i => i.key === key) || null;
+  const res = await fetch(`/api/items/${key}`);
+  if (!res.ok) return;
+  const item = await res.json();
+
+  document.getElementById('detail').classList.add('open');
+  const color = tc(item.type);
+
+  document.getElementById('di').innerHTML = `
+    <span class="d-badge" style="background:${color}22;color:${color}">${item.type}</span>
+    ${item.hasManual ? '<span class="src-badge src-manual" style="margin-left:4px">manually edited</span>' : ''}
+    <div id="d-title">${esc(item.title)}</div>
+    ${mr('Authors', item.authors)}
+    ${mr('Year', item.year
+      ? `${item.year} ${srcBadge(item.source, item.confidence)}${item.yearRaw && item.source !== 'filename' && item.yearRaw !== item.year ? `<span style="color:var(--dim);font-size:10px"> (filename: ${item.yearRaw})</span>` : ''}`
+      : '—')}
+    ${item.note ? mr('Note', `<span style="color:var(--dim)">${esc(item.note)}</span>`) : ''}
+    ${item.siteName ? mr('Site', item.siteName) : ''}
+    ${mr('File', item.filename)}
+    ${mr('Key', `<code style="font-size:10px;color:var(--dim)">${item.key}</code>`)}
+    ${item.description ? `<div id="d-desc">${esc(item.description)}</div>` : ''}
+
+    <div id="d-edit-form">
+      <h4>Manual Override</h4>
+      <div class="ef-field"><label>Year</label>
+        <input type="number" id="ef-year" value="${item.manual_year ?? ''}" placeholder="e.g. 1981" min="1000" max="2100" /></div>
+      <div class="ef-field"><label>Title</label>
+        <input type="text" id="ef-title" value="${esc(item.manual_title ?? item.title ?? '')}" /></div>
+      <div class="ef-field"><label>Authors</label>
+        <input type="text" id="ef-authors" value="${esc(item.manual_authors ?? item.authors ?? '')}" /></div>
+      <div class="ef-field"><label>Note</label>
+        <input type="text" id="ef-note" value="${esc(item.manual_note ?? '')}" placeholder="e.g. original pub 1867, this is 1990 translation" /></div>
+      <div class="ef-btns">
+        <button class="ef-save" onclick="saveManual('${key}')">Save</button>
+        <button class="ef-clear" onclick="clearManual('${key}')">Clear overrides</button>
+      </div>
+    </div>
+  `;
+  if (currentView === 'timeline') render();
+}
+
+function hideDetail() {
+  selected = null;
+  document.getElementById('detail').classList.remove('open');
+  if (currentView === 'timeline') render();
+}
+
+async function saveManual(key) {
+  const year    = document.getElementById('ef-year').value.trim();
+  const title   = document.getElementById('ef-title').value.trim();
+  const authors = document.getElementById('ef-authors').value.trim();
+  const note    = document.getElementById('ef-note').value.trim();
+  const res = await fetch(`/api/items/${key}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ year: year || null, title, authors, note }),
+  });
+  if (!res.ok) return;
+  const updated = await res.json();
+  const idx = allItems.findIndex(i => i.key === key);
+  if (idx >= 0) allItems[idx] = updated;
+  applyFilters();
+  openDetail(key);
+}
+
+async function clearManual(key) {
+  const res = await fetch(`/api/items/${key}/manual`, { method: 'DELETE' });
+  if (!res.ok) return;
+  const updated = await res.json();
+  const idx = allItems.findIndex(i => i.key === key);
+  if (idx >= 0) allItems[idx] = updated;
+  applyFilters();
+  openDetail(key);
+}
+
+function mr(k, v) {
+  if (!v && v !== 0) return '';
+  return `<div class="mr"><span class="mk">${k}</span><span class="mv">${v}</span></div>`;
+}
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── TIMELINE LAYOUT & RENDER ───────────────────────────────────
 function yearToX(y) { return camX + y * BASE * zoom; }
 function xToYear(x) { return (x - camX) / (BASE * zoom); }
 function slotY(idx) {
@@ -533,279 +551,200 @@ function slotY(idx) {
   return idx % 2 === 1 ? AXIS_Y - h * GAP : AXIS_Y + h * GAP;
 }
 
-// ── RENDER ──────────────────────────────────────────────────
+function computeLayout(items) {
+  const byYear = {};
+  items.forEach(i => { const k = i.year ?? '__none__'; (byYear[k]=byYear[k]||[]).push(i); });
+  const out = [];
+  Object.entries(byYear).forEach(([k, grp]) => {
+    grp.forEach((item, idx) => out.push({ item, year: k==='__none__'?null:+k, slotIdx:idx, noDate:k==='__none__' }));
+  });
+  return out;
+}
+
 function render() {
   const W = canvas.width, H = canvas.height;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle = '#0f1117'; ctx.fillRect(0,0,W,H);
 
   if (!filtItems.length) {
-    ctx.fillStyle = '#2e3455'; ctx.font = '13px monospace'; ctx.textAlign = 'center';
-    ctx.fillText('No items match the current filter.', W/2, H/2);
-    return;
+    ctx.fillStyle='#2e3455'; ctx.font='13px monospace'; ctx.textAlign='center';
+    ctx.fillText('No items match the current filter.', W/2, H/2); return;
   }
 
-  const layout = computeLayout(filtItems);
+  const layout  = computeLayout(filtItems);
   const noDates = layout.filter(l => l.noDate);
-  const pxPerYear = BASE * zoom;
+  const pxPerY  = BASE * zoom;
+  const y0 = Math.floor(xToYear(0))-1, y1 = Math.ceil(xToYear(W))+1;
+  const step = pxPerY<10?50:pxPerY<20?20:pxPerY<40?10:pxPerY<80?5:pxPerY<160?2:1;
+  const first = Math.ceil(y0/step)*step;
 
-  // Grid lines + year labels
-  const y0 = Math.floor(xToYear(0)) - 1;
-  const y1 = Math.ceil(xToYear(W)) + 1;
-  const step = pxPerYear < 10 ? 50 : pxPerYear < 20 ? 20 : pxPerYear < 40 ? 10 : pxPerYear < 80 ? 5 : pxPerYear < 160 ? 2 : 1;
-  const first = Math.ceil(y0 / step) * step;
-
-  ctx.strokeStyle = '#1a1e30'; ctx.lineWidth = 1;
-  for (let yr = first; yr <= y1; yr += step) {
+  ctx.strokeStyle='#1a1e30'; ctx.lineWidth=1;
+  for (let yr=first; yr<=y1; yr+=step) {
     const x = Math.round(yearToX(yr));
     ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-    ctx.fillStyle = '#2e3455'; ctx.font = '10px monospace'; ctx.textAlign = 'center';
-    ctx.fillText(yr, x, H - 7);
+    ctx.fillStyle='#2e3455'; ctx.font='10px monospace'; ctx.textAlign='center';
+    ctx.fillText(yr, x, H-7);
   }
 
-  // Axis
-  ctx.strokeStyle = '#2e3250'; ctx.lineWidth = 1.5;
-  ctx.beginPath(); ctx.moveTo(0, AXIS_Y); ctx.lineTo(W, AXIS_Y); ctx.stroke();
+  ctx.strokeStyle='#2e3250'; ctx.lineWidth=1.5;
+  ctx.beginPath(); ctx.moveTo(0,AXIS_Y); ctx.lineTo(W,AXIS_Y); ctx.stroke();
 
-  // Items
   layout.forEach(({ item, year, slotIdx, noDate }) => {
-    const idx = noDate ? noDates.findIndex(l => l.item === item) : -1;
-    const x = noDate ? 22 + idx * 14 : yearToX(year);
+    const idx = noDate ? noDates.findIndex(l=>l.item===item) : -1;
+    const x = noDate ? 22+idx*14 : yearToX(year);
     const y = slotY(slotIdx);
-    const isHov = hovered === item, isSel = selected === item;
-    const r = isHov || isSel ? DOT_R + 2 : DOT_R;
+    const isHov = hovered===item, isSel = selected===item;
+    const r = isHov||isSel ? DOT_R+2 : DOT_R;
     const color = tc(item.type);
-    const src   = yearSource(item);
-    // Dim items where year is only a mtime fallback (least reliable)
-    const alpha = src === 'fallback' ? '77' : src === null ? '55' : 'ee';
+    const src = item.source;
+    const alpha = src==='fallback'?'66' : src===null?'44' : 'ee';
 
-    if (Math.abs(y - AXIS_Y) > 1) {
-      ctx.strokeStyle = color + '40'; ctx.lineWidth = 1;
-      ctx.beginPath(); ctx.moveTo(x, AXIS_Y); ctx.lineTo(x, y); ctx.stroke();
+    if (Math.abs(y-AXIS_Y)>1) {
+      ctx.strokeStyle=color+'40'; ctx.lineWidth=1;
+      ctx.beginPath(); ctx.moveTo(x,AXIS_Y); ctx.lineTo(x,y); ctx.stroke();
     }
-
     if (isSel) {
-      ctx.beginPath(); ctx.arc(x, y, r+5, 0, Math.PI*2);
-      ctx.fillStyle = color + '25'; ctx.fill();
+      ctx.beginPath(); ctx.arc(x,y,r+5,0,Math.PI*2);
+      ctx.fillStyle=color+'25'; ctx.fill();
+    }
+    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+    ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
+
+    // Manual edit indicator — small dot
+    if (item.hasManual) {
+      ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
+      ctx.fillStyle='#f43f5e'; ctx.fill();
     }
 
-    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI*2);
-    ctx.fillStyle = color + (isHov || isSel ? 'ff' : alpha); ctx.fill();
-
-    if (isHov || isSel || pxPerYear > 130) {
-      const lbl = item.title.length > 32 ? item.title.slice(0,30)+'…' : item.title;
-      ctx.font = `${isSel ? '700' : '400'} 10px monospace`;
-      ctx.fillStyle = isSel ? '#fff' : '#a0a6c4'; ctx.textAlign = 'center';
-      ctx.fillText(lbl, x, y < AXIS_Y ? y - r - 4 : y + r + 12);
+    if (isHov||isSel||pxPerY>130) {
+      const lbl = item.title.length>32 ? item.title.slice(0,30)+'…' : item.title;
+      ctx.font=`${isSel?'700':'400'} 10px monospace`;
+      ctx.fillStyle=isSel?'#fff':'#a0a6c4'; ctx.textAlign='center';
+      ctx.fillText(lbl, x, y<AXIS_Y?y-r-4:y+r+12);
     }
   });
 
-  // No-date bucket label
   if (noDates.length) {
-    ctx.font = '9px monospace'; ctx.fillStyle = '#2e3455'; ctx.textAlign = 'left';
-    ctx.fillText('NO DATE', 4, H - 7);
+    ctx.font='9px monospace'; ctx.fillStyle='#2e3455'; ctx.textAlign='left';
+    ctx.fillText('NO DATE', 4, H-7);
   }
 }
 
-// ── HIT TEST ────────────────────────────────────────────────
 function hitTest(mx, my) {
   const layout = computeLayout(filtItems);
-  const noDates = layout.filter(l => l.noDate);
-  let best = null, bestD = 14;
+  const noDates = layout.filter(l=>l.noDate);
+  let best=null, bestD=14;
   layout.forEach(({ item, year, slotIdx, noDate }) => {
-    const idx = noDate ? noDates.findIndex(l => l.item === item) : -1;
-    const x = noDate ? 22 + idx * 14 : yearToX(year);
+    const idx = noDate ? noDates.findIndex(l=>l.item===item) : -1;
+    const x = noDate ? 22+idx*14 : yearToX(year);
     const y = slotY(slotIdx);
     const d = Math.hypot(mx-x, my-y);
-    if (d < bestD) { bestD = d; best = item; }
+    if (d<bestD) { bestD=d; best=item; }
   });
   return best;
 }
 
-// ── DETAIL PANEL ────────────────────────────────────────────
-const SOURCE_LABELS = {
-  crossref:    ['crossref',    'src-crossref'],
-  openlibrary: ['openlibrary', 'src-openlibrary'],
-  claude:      ['claude AI',   'src-claude'],
-  filename:    ['filename',    'src-filename'],
-  fallback:    ['file date',   'src-fallback'],
-};
-
-function yearDisplay(item) {
-  const e   = enriched[item.key];
-  const src = yearSource(item);
-  const yr  = effectiveYear(item);
-  if (!yr) return '—';
-
-  const [label, cls] = SOURCE_LABELS[src] || ['?', ''];
-  const conf = e?.confidence === 'low' ? ' conf-low' : '';
-  let html = `${yr} <span class="src-badge ${cls}${conf}">${label}</span>`;
-
-  // Show original year from filename if enrichment changed it
-  if (e?.year && item.year && e.year !== item.year) {
-    html += `<span style="color:var(--dim);font-size:10px;margin-left:4px">(was ${item.year})</span>`;
-  }
-  if (e?.note) {
-    html += `<br><span style="color:var(--dim);font-size:10px;display:block;margin-top:3px">${esc(e.note)}</span>`;
-  }
-  return html;
-}
-
-function showDetail(item) {
-  selected = item;
-  document.getElementById('detail').classList.add('open');
-  const color = tc(item.type);
-  document.getElementById('di').innerHTML = `
-    <span class="d-badge" style="background:${color}22;color:${color}">${item.type}</span>
-    <div id="d-title">${esc(item.title)}</div>
-    ${mr('Authors', item.authors)}
-    ${mr('Year', yearDisplay(item))}
-    ${mr('Filename', item.filename)}
-    ${mr('Key', `<code style="font-size:10px">${item.key}</code>`)}
-  `;
-  render();
-}
-
-function hideDetail() { selected = null; document.getElementById('detail').classList.remove('open'); render(); }
-
-function mr(k, v) {
-  if (!v) return '';
-  return `<div class="mr"><span class="mk">${k}</span><span class="mv">${v}</span></div>`;
-}
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-// ── VIEW ────────────────────────────────────────────────────
 function fitView() {
-  const dated = filtItems.filter(i => effectiveYear(i) != null);
+  const dated = filtItems.filter(i=>i.year!=null);
   if (!dated.length) return;
-  const ys = dated.map(i => effectiveYear(i));
-  const mn = Math.min(...ys), mx = Math.max(...ys);
-  const span = Math.max(mx - mn, 5);
-  zoom = (canvas.width - 120) / (span * BASE);
-  camX = 60 - mn * BASE * zoom;
+  const ys = dated.map(i=>i.year);
+  const mn=Math.min(...ys), mx=Math.max(...ys), span=Math.max(mx-mn,5);
+  zoom = (canvas.width-120)/(span*BASE);
+  camX = 60-mn*BASE*zoom;
 }
 
 function updateStats() {
-  const withYear = filtItems.filter(i => i.year != null);
-  const ys = withYear.map(i => i.year);
+  const withY = filtItems.filter(i=>i.year!=null), ys=withY.map(i=>i.year);
+  const enriched = filtItems.filter(i=>i.source&&i.source!=='filename'&&i.source!=='fallback').length;
   document.getElementById('st').textContent  = filtItems.length;
-  document.getElementById('sy').textContent  = `${withYear.length} / ${filtItems.length}`;
-  document.getElementById('sr').textContent  = ys.length ? `${Math.min(...ys)} – ${Math.max(...ys)}` : '—';
-  document.getElementById('stp').textContent = new Set(filtItems.map(i => i.type)).size;
+  document.getElementById('sy').textContent  = `${withY.length}/${filtItems.length}`;
+  document.getElementById('sr').textContent  = ys.length?`${Math.min(...ys)}–${Math.max(...ys)}`:'—';
+  document.getElementById('stp').textContent = new Set(filtItems.map(i=>i.type)).size;
+  document.getElementById('se').textContent  = enriched;
 }
 
 function resizeCanvas() {
   const w = document.getElementById('canvas-wrap');
-  canvas.width = w.clientWidth; canvas.height = w.clientHeight;
-  render();
+  canvas.width=w.clientWidth; canvas.height=w.clientHeight; render();
 }
 
-// ── CANVAS EVENTS ───────────────────────────────────────────
-canvas.addEventListener('mousedown', e => { isDrag = true; dragX0 = e.clientX; camX0 = camX; });
+// ── CANVAS EVENTS ──────────────────────────────────────────────
+canvas.addEventListener('mousedown', e => { isDrag=true; dragX0=e.clientX; camX0=camX; });
 canvas.addEventListener('mousemove', e => {
-  const r = canvas.getBoundingClientRect();
-  if (isDrag) { camX = camX0 + (e.clientX - dragX0); render(); return; }
-  const hit = hitTest(e.clientX - r.left, e.clientY - r.top);
-  if (hit !== hovered) { hovered = hit; canvas.style.cursor = hit ? 'pointer' : 'grab'; render(); }
+  const r=canvas.getBoundingClientRect();
+  if (isDrag) { camX=camX0+(e.clientX-dragX0); render(); return; }
+  const hit=hitTest(e.clientX-r.left, e.clientY-r.top);
+  if (hit!==hovered) { hovered=hit; canvas.style.cursor=hit?'pointer':'grab'; render(); }
 });
 canvas.addEventListener('mouseup', e => {
   if (!isDrag) return;
-  const moved = Math.abs(e.clientX - dragX0) > 3;
-  isDrag = false;
+  const moved=Math.abs(e.clientX-dragX0)>3; isDrag=false;
   if (!moved) {
-    const r = canvas.getBoundingClientRect();
-    const hit = hitTest(e.clientX - r.left, e.clientY - r.top);
-    hit ? showDetail(hit) : hideDetail();
+    const r=canvas.getBoundingClientRect();
+    const hit=hitTest(e.clientX-r.left, e.clientY-r.top);
+    hit ? openDetail(hit.key) : hideDetail();
   }
 });
-canvas.addEventListener('mouseleave', () => { isDrag = false; });
+canvas.addEventListener('mouseleave', () => { isDrag=false; });
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  const r = canvas.getBoundingClientRect();
-  const mx = e.clientX - r.left;
-  const yearAt = xToYear(mx);
-  zoom = Math.max(0.02, Math.min(zoom * (e.deltaY < 0 ? 1.15 : 1/1.15), 80));
-  camX = mx - yearAt * BASE * zoom;
-  render();
-}, { passive: false });
+  const r=canvas.getBoundingClientRect(), mx=e.clientX-r.left;
+  const yAt=xToYear(mx);
+  zoom=Math.max(.02,Math.min(zoom*(e.deltaY<0?1.15:1/1.15),80));
+  camX=mx-yAt*BASE*zoom; render();
+}, { passive:false });
 
-document.getElementById('bzi').onclick = () => { zoom *= 1.4; render(); };
-document.getElementById('bzo').onclick = () => { zoom /= 1.4; render(); };
+document.getElementById('bzi').onclick = () => { zoom*=1.4; render(); };
+document.getElementById('bzo').onclick = () => { zoom/=1.4; render(); };
 document.getElementById('bzf').onclick = () => { fitView(); render(); };
-document.getElementById('dc').onclick = hideDetail;
-document.getElementById('search-inp').addEventListener('input', e => { q = e.target.value; applyFilters(); });
+document.getElementById('dc').onclick  = hideDetail;
+document.getElementById('search-inp').addEventListener('input', e => { q=e.target.value; applyFilters(); });
 
-// ── ENRICH MODAL ────────────────────────────────────────────
+document.getElementById('btn-refresh').onclick = doScan;
+
+// ── ENRICH MODAL ──────────────────────────────────────────────
 document.getElementById('btn-enrich').onclick = () => {
   document.getElementById('enrich-modal').classList.add('show');
-  document.getElementById('enrich-error').textContent = '';
-  document.getElementById('enrich-status').textContent = 'Ready. Will query CrossRef + OpenLibrary, then Claude if a key is provided.';
-  document.getElementById('enrich-prog-wrap').style.display = 'none';
-  document.getElementById('enrich-prog').style.width = '0%';
-  document.getElementById('btn-run-enrich').disabled = false;
+  document.getElementById('e-error').textContent='';
+  document.getElementById('e-status').textContent='Ready.';
+  document.getElementById('ep-wrap').style.display='none';
+  document.getElementById('ep').style.width='0%';
+  document.getElementById('btn-run-enrich').disabled=false;
 };
-document.getElementById('btn-close-enrich').onclick = () => {
+document.getElementById('btn-close-enrich').onclick = () =>
   document.getElementById('enrich-modal').classList.remove('show');
-};
 
 document.getElementById('btn-run-enrich').onclick = () => {
   const claudeKey = document.getElementById('claude-key-inp').value.trim();
-  const url = `${API}/api/enrich${claudeKey ? '?claude_key=' + encodeURIComponent(claudeKey) : ''}`;
-  const statusEl  = document.getElementById('enrich-status');
-  const progEl    = document.getElementById('enrich-prog');
-  const progWrap  = document.getElementById('enrich-prog-wrap');
-  const errorEl   = document.getElementById('enrich-error');
-  const btn       = document.getElementById('btn-run-enrich');
-
-  btn.disabled = true;
-  errorEl.textContent = '';
-  progWrap.style.display = 'block';
+  const url = `/api/enrich${claudeKey?'?claude_key='+encodeURIComponent(claudeKey):''}`;
+  const btn=document.getElementById('btn-run-enrich');
+  btn.disabled=true;
+  document.getElementById('e-error').textContent='';
+  document.getElementById('ep-wrap').style.display='block';
 
   const es = new EventSource(url);
-
   es.addEventListener('progress', e => {
-    const d = JSON.parse(e.data);
-    if (d.stage === 'apis') {
-      const pct = d.total > 0 ? Math.round((d.done / d.total) * (claudeKey ? 80 : 100)) : 2;
-      progEl.style.width = pct + '%';
-      statusEl.textContent = `CrossRef + OpenLibrary: ${d.done} / ${d.total} items…`;
-    } else if (d.stage === 'claude') {
-      const pct = 80 + Math.round((d.done / d.total) * 20);
-      progEl.style.width = pct + '%';
-      statusEl.textContent = `Claude AI: ${d.done} / ${d.total} items…`;
-    }
+    const d=JSON.parse(e.data);
+    const pct = d.stage==='apis' ? Math.round(d.done/d.total*(claudeKey?80:100))
+              : 80+Math.round(d.done/d.total*20);
+    document.getElementById('ep').style.width=pct+'%';
+    document.getElementById('e-status').textContent =
+      d.stage==='apis' ? `CrossRef + OpenLibrary: ${d.done}/${d.total}…`
+                       : `Claude AI: ${d.done}/${d.total}…`;
   });
-
   es.addEventListener('done', e => {
-    es.close();
-    btn.disabled = false;
-    progEl.style.width = '100%';
-    enriched = JSON.parse(e.data);
-    const count = Object.keys(enriched).length;
-    statusEl.textContent = `Done — enriched ${count} items.`;
-    updateLibInfo();
+    es.close(); btn.disabled=false;
+    document.getElementById('ep').style.width='100%';
+    allItems = JSON.parse(e.data);
+    document.getElementById('e-status').textContent=`Done — ${allItems.filter(i=>i.source&&i.source!=='filename'&&i.source!=='fallback').length} items enriched.`;
     applyFilters();
-    // Close modal after a short delay
-    setTimeout(() => document.getElementById('enrich-modal').classList.remove('show'), 1500);
+    setTimeout(()=>document.getElementById('enrich-modal').classList.remove('show'), 1500);
   });
-
   es.addEventListener('error', e => {
-    es.close();
-    btn.disabled = false;
-    try { errorEl.textContent = JSON.parse(e.data).message; }
-    catch { errorEl.textContent = 'Enrichment failed — check console for details.'; }
+    es.close(); btn.disabled=false;
+    try { document.getElementById('e-error').textContent=JSON.parse(e.data).message; }
+    catch { document.getElementById('e-error').textContent='Enrichment failed.'; }
   });
-};
-document.getElementById('btn-refresh').onclick = async () => {
-  await fetch(`${API}/api/cache`, { method: 'DELETE' }).catch(() => {});
-  document.getElementById('scan-overlay').classList.remove('hidden');
-  document.getElementById('btn-rescan').style.display = 'none';
-  document.getElementById('btn-use-cache').style.display = 'none';
-  document.getElementById('scan-error').textContent = '';
-  setProgress(0, 'Starting re-scan…');
-  doScan();
 };
 
 window.addEventListener('resize', resizeCanvas);
