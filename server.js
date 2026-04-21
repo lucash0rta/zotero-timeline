@@ -3,6 +3,8 @@ import { readFileSync, writeFileSync, existsSync, unlinkSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 import { Buffer } from 'buffer';
+import { createHmac, timingSafeEqual } from 'crypto';
+import { exec } from 'child_process';
 import { enrichItems } from './enrich.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -17,14 +19,18 @@ if (existsSync(join(__dirname, '.env'))) {
 }
 
 // ── Config ────────────────────────────────────────────────────
-const WEBDAV_BASE = process.env.WEBDAV_BASE;
-const WEBDAV_USER = process.env.WEBDAV_USER;
-const WEBDAV_PASS = process.env.WEBDAV_PASS;
-const PORT        = parseInt(process.env.PORT || '3001', 10);
-const CONCURRENCY = 8;
+const WEBDAV_BASE      = process.env.WEBDAV_BASE;
+const WEBDAV_USER      = process.env.WEBDAV_USER;
+const WEBDAV_PASS      = process.env.WEBDAV_PASS;
+const PORT             = parseInt(process.env.PORT || '3001', 10);
+const APP_USER         = process.env.APP_USER;
+const APP_PASS         = process.env.APP_PASS;
+const WEBHOOK_SECRET   = process.env.WEBHOOK_SECRET;
+const PM2_APP_NAME     = process.env.PM2_APP_NAME || 'zotero-timeline';
+const CONCURRENCY      = 8;
 
 if (!WEBDAV_BASE || !WEBDAV_USER || !WEBDAV_PASS) {
-  console.error('\nMissing required environment variables. Copy .env.example to .env and fill it in.\n');
+  console.error('\nMissing required env vars. Copy .env.example → .env and fill it in.\n');
   process.exit(1);
 }
 
@@ -162,6 +168,52 @@ async function scanLibrary(onProgress) {
 
 // ── Express app ───────────────────────────────────────────────
 const app = express();
+
+// ── GitHub webhook (unauthenticated — verified by HMAC) ───────
+app.post('/webhook', express.raw({ type: 'application/json' }), (req, res) => {
+  if (WEBHOOK_SECRET) {
+    const sig  = req.headers['x-hub-signature-256'] || '';
+    const hmac = 'sha256=' + createHmac('sha256', WEBHOOK_SECRET).update(req.body).digest('hex');
+    try {
+      if (!timingSafeEqual(Buffer.from(sig), Buffer.from(hmac))) {
+        return res.status(401).json({ error: 'Bad signature' });
+      }
+    } catch {
+      return res.status(401).json({ error: 'Bad signature' });
+    }
+  }
+
+  const payload = JSON.parse(req.body);
+  if (payload.ref !== 'refs/heads/main') {
+    return res.json({ ok: true, skipped: 'not main branch' });
+  }
+
+  res.json({ ok: true, message: 'Deploying…' });
+  console.log('[webhook] Pull triggered by GitHub push');
+
+  exec('git pull && npm install --omit=dev', { cwd: __dirname }, (err, stdout, stderr) => {
+    if (err) { console.error('[webhook] git pull failed:', stderr); return; }
+    console.log('[webhook] Pull done, restarting…', stdout.trim());
+    exec(`pm2 restart ${PM2_APP_NAME}`, err2 => {
+      if (err2) console.error('[webhook] pm2 restart failed:', err2.message);
+      else console.log('[webhook] Restarted OK');
+    });
+  });
+});
+
+// ── HTTP basic auth ───────────────────────────────────────────
+if (APP_USER && APP_PASS) {
+  app.use((req, res, next) => {
+    const auth = req.headers.authorization || '';
+    if (auth.startsWith('Basic ')) {
+      const [u, p] = Buffer.from(auth.slice(6), 'base64').toString().split(':');
+      if (u === APP_USER && p === APP_PASS) return next();
+    }
+    res.setHeader('WWW-Authenticate', 'Basic realm="Zotero Timeline"');
+    res.status(401).send('Authentication required');
+  });
+}
+
 app.use(express.static(__dirname));
 
 // SSE progress + final data
