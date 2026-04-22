@@ -133,6 +133,11 @@ function extractFromHTML(html) {
                || html.match(/<meta[^>]+property="article:author"[^>]+content="([^"]+)"/i);
   if (authorM) result.htmlAuthor = authorM[1];
 
+  // og:image for webpage cover
+  const imgM = html.match(/<meta[^>]+property="og:image"[^>]+content="([^"]+)"/i)
+            || html.match(/<meta[^>]+content="([^"]+)"[^>]+property="og:image"/i);
+  if (imgM?.[1]?.startsWith('http')) result.coverUrl = imgM[1];
+
   // Extract year from dateStr
   if (result.dateStr) {
     const ym = result.dateStr.match(/\b(1[5-9]\d{2}|20\d{2})\b/);
@@ -280,9 +285,9 @@ async function scanLibrary(onProgress) {
           htmlMeta.htmlTitle || item.title,
           key
         );
-        if (htmlMeta.description || htmlMeta.siteName) {
-          db.prepare(`UPDATE items SET description=?, site_name=? WHERE key=?`)
-            .run(htmlMeta.description ?? null, htmlMeta.siteName ?? null, key);
+        if (htmlMeta.description || htmlMeta.siteName || htmlMeta.coverUrl) {
+          db.prepare(`UPDATE items SET description=?, site_name=?, cover_url=COALESCE(cover_url,?) WHERE key=?`)
+            .run(htmlMeta.description ?? null, htmlMeta.siteName ?? null, htmlMeta.coverUrl ?? null, key);
         }
       }
     }
@@ -404,6 +409,72 @@ app.get('/api/enrich', async (req, res) => {
   }
 });
 
+// ── Cover image fetching ──────────────────────────────────────
+async function fetchCoverForItem(item) {
+  const title   = item.manual_title   || item.title   || '';
+  const authors = item.manual_authors || item.authors || '';
+  const year    = item.manual_year    ?? item.enriched_year ?? item.year ?? null;
+
+  // 1. OpenLibrary search
+  try {
+    const q = encodeURIComponent(`${title} ${authors}`.trim().slice(0, 100));
+    const res = await fetch(
+      `https://openlibrary.org/search.json?q=${q}&limit=1&fields=cover_i,title`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const coverId = data.docs?.[0]?.cover_i;
+      if (coverId) return `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
+    }
+  } catch { /* network error */ }
+
+  // 2. Google Books
+  try {
+    const q = encodeURIComponent(`${title} ${authors}`.trim().slice(0, 100));
+    const res = await fetch(
+      `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`,
+      { signal: AbortSignal.timeout(6000) }
+    );
+    if (res.ok) {
+      const data = await res.json();
+      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
+      if (thumb) return thumb.replace('http://', 'https://');
+    }
+  } catch { /* network error */ }
+
+  return null;
+}
+
+app.get('/api/covers', async (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  const send = (ev, data) => res.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  const db = getDb();
+  const items = db.prepare(`SELECT * FROM items WHERE cover_url IS NULL AND type IN ('PDF','Ebook','Document')`).all();
+
+  if (!items.length) {
+    send('done', { updated: 0 });
+    return res.end();
+  }
+
+  let done = 0, updated = 0;
+  await pool(items, 4, async row => {
+    const url = await fetchCoverForItem(row).catch(() => null);
+    if (url) {
+      db.prepare(`UPDATE items SET cover_url=? WHERE key=?`).run(url, row.key);
+      updated++;
+    }
+    done++;
+    send('progress', { done, total: items.length });
+  });
+
+  send('done', { updated });
+  res.end();
+});
+
 // ── API: manual override ──────────────────────────────────────
 app.patch('/api/items/:key', (req, res) => {
   const { year, title, authors, note } = req.body;
@@ -429,8 +500,8 @@ app.get('/api/items/:key', (req, res) => {
   if (!row) return res.status(404).json({ error: 'Not found' });
   const db = getDb();
   // Pull description/site_name if they exist
-  const ext = db.prepare('SELECT description, site_name FROM items WHERE key=?').get(req.params.key);
-  res.json({ ...toFrontend(row), description: ext?.description, siteName: ext?.site_name });
+  const ext = db.prepare('SELECT description, site_name, cover_url FROM items WHERE key=?').get(req.params.key);
+  res.json({ ...toFrontend(row), description: ext?.description, siteName: ext?.site_name, coverUrl: ext?.cover_url });
 });
 
 app.listen(PORT, () => {

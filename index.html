@@ -197,6 +197,7 @@
       <button id="btn-view-tb" onclick="setView('table')">Table</button>
     </div>
     <button class="tbtn" id="btn-enrich">Enrich Dates</button>
+    <button class="tbtn" id="btn-covers">Fetch Covers</button>
     <button class="tbtn" id="btn-refresh">Rescan</button>
   </div>
 </div>
@@ -268,7 +269,27 @@ let sortCol = 'year', sortDir = 1;
 const canvas = document.getElementById('tl');
 const ctx = canvas.getContext('2d');
 const DOT_R = 6, GAP = 22, BASE = 60;
-let AXIS_Y = 120;
+let AXIS_Y = 120;   // horizontal mode: axis Y position
+let AXIS_X = 120;   // vertical mode: axis X position
+let isVertical = false;
+
+// coordinate helpers — swap based on orientation
+function yearToX(yr) { return camX + yr * BASE * zoom; }
+function xToYear(x)  { return (x - camX) / (BASE * zoom); }
+function yearToY(yr) { return camY + yr * BASE * zoom; }
+function yToYear(y)  { return (y - camY) / (BASE * zoom); }
+function slotY(idx) {
+  if (idx === 0) return AXIS_Y;
+  const h = Math.ceil(idx / 2);
+  return idx % 2 === 1 ? AXIS_Y - h * GAP : AXIS_Y + h * GAP;
+}
+function slotX(idx) {
+  if (idx === 0) return AXIS_X;
+  const h = Math.ceil(idx / 2);
+  return idx % 2 === 1 ? AXIS_X + h * GAP : AXIS_X - h * GAP;
+}
+
+let camY = 0;
 
 // ── SCAN ───────────────────────────────────────────────────────
 async function checkExisting() {
@@ -457,8 +478,9 @@ async function openDetail(key) {
   const color = tc(item.type);
 
   document.getElementById('di').innerHTML = `
-    <span class="d-badge" style="background:${color}22;color:${color}">${item.type}</span>
-    ${item.hasManual ? '<span class="src-badge src-manual" style="margin-left:4px">manually edited</span>' : ''}
+    ${item.coverUrl ? `<img src="${esc(item.coverUrl)}" alt="cover" style="max-width:100%;max-height:200px;display:block;margin-bottom:10px;border:1px solid #000;">` : ''}
+    <span class="d-badge" style="border-color:${color};color:${color}">${item.type}</span>
+    ${item.hasManual ? ' <span class="src-badge src-manual">edited</span>' : ''}
     <div id="d-title">${esc(item.title)}</div>
     ${mr('Authors', item.authors)}
     ${mr('Year', item.year
@@ -532,14 +554,6 @@ function esc(s) {
 }
 
 // ── TIMELINE LAYOUT & RENDER ───────────────────────────────────
-function yearToX(y) { return camX + y * BASE * zoom; }
-function xToYear(x) { return (x - camX) / (BASE * zoom); }
-function slotY(idx) {
-  if (idx === 0) return AXIS_Y;
-  const h = Math.ceil(idx / 2);
-  return idx % 2 === 1 ? AXIS_Y - h * GAP : AXIS_Y + h * GAP;
-}
-
 function computeLayout(items) {
   const byYear = {};
   items.forEach(i => { const k = i.year ?? '__none__'; (byYear[k]=byYear[k]||[]).push(i); });
@@ -562,72 +576,145 @@ function render() {
   const layout  = computeLayout(filtItems);
   const noDates = layout.filter(l => l.noDate);
   const pxPerY  = BASE * zoom;
-  const y0 = Math.floor(xToYear(0))-1, y1 = Math.ceil(xToYear(W))+1;
   const step = pxPerY<10?50:pxPerY<20?20:pxPerY<40?10:pxPerY<80?5:pxPerY<160?2:1;
-  const first = Math.ceil(y0/step)*step;
 
-  // faint vertical grid lines
-  ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=1;
-  for (let yr=first; yr<=y1; yr+=step) {
-    const x = Math.round(yearToX(yr));
-    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
-  }
+  if (isVertical) {
+    // ── VERTICAL (mobile) ──────────────────────────────────────
+    const yr0 = Math.floor(yToYear(0))-1, yr1 = Math.ceil(yToYear(H))+1;
+    const first = Math.ceil(yr0/step)*step;
 
-  // axis line
-  ctx.strokeStyle='#000'; ctx.lineWidth=2;
-  ctx.beginPath(); ctx.moveTo(0,AXIS_Y); ctx.lineTo(W,AXIS_Y); ctx.stroke();
-
-  // tick marks + year labels on axis
-  for (let yr=first; yr<=y1; yr+=step) {
-    const x = Math.round(yearToX(yr));
-    const isMajor = yr % 10 === 0;
-    const tickH = isMajor ? 10 : 5;
-    ctx.strokeStyle='#000'; ctx.lineWidth = isMajor ? 2 : 1;
-    ctx.beginPath(); ctx.moveTo(x, AXIS_Y - tickH); ctx.lineTo(x, AXIS_Y + tickH); ctx.stroke();
-    ctx.fillStyle='#000';
-    ctx.font = isMajor ? 'bold 11px Verdana,Arial,sans-serif' : '9px Verdana,Arial,sans-serif';
-    ctx.textAlign='center';
-    ctx.fillText(yr, x, AXIS_Y + tickH + 13);
-  }
-
-  layout.forEach(({ item, year, slotIdx, noDate }) => {
-    if (noDate) return; // undated items have no timeline position — shown in Table view
-    const x = yearToX(year);
-    const y = slotY(slotIdx);
-    const isHov = hovered===item, isSel = selected===item;
-    const r = isHov||isSel ? DOT_R+2 : DOT_R;
-    const color = tc(item.type);
-    const src = item.source;
-    const alpha = src==='fallback'?'66' : src===null?'44' : 'ee';
-
-    if (Math.abs(y-AXIS_Y)>1) {
-      ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
-      ctx.beginPath(); ctx.moveTo(x,AXIS_Y); ctx.lineTo(x,y); ctx.stroke();
-    }
-    if (isSel) {
-      ctx.beginPath(); ctx.arc(x,y,r+5,0,Math.PI*2);
-      ctx.fillStyle=color+'25'; ctx.fill();
-    }
-    ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
-    ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
-    ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.stroke();
-
-    if (item.hasManual) {
-      ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
-      ctx.fillStyle='#000'; ctx.fill();
+    // faint horizontal grid lines
+    ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=1;
+    for (let yr=first; yr<=yr1; yr+=step) {
+      const y = Math.round(yearToY(yr));
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
     }
 
-    if (isHov||isSel||pxPerY>130) {
-      const lbl = item.title.length>32 ? item.title.slice(0,30)+'…' : item.title;
-      ctx.font=`${isSel?'bold ':''} 9px Verdana,Arial,sans-serif`;
-      ctx.fillStyle='#000'; ctx.textAlign='center';
-      ctx.fillText(lbl, x, y<AXIS_Y?y-r-4:y+r+12);
-    }
-  });
+    // axis line (vertical)
+    ctx.strokeStyle='#000'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(AXIS_X,0); ctx.lineTo(AXIS_X,H); ctx.stroke();
 
-  if (noDates.length) {
-    ctx.font='9px Verdana,Arial,sans-serif'; ctx.fillStyle='#000'; ctx.textAlign='left';
-    ctx.fillText(`${noDates.length} undated — see Table view`, 10, H-10);
+    // tick marks + year labels
+    for (let yr=first; yr<=yr1; yr+=step) {
+      const y = Math.round(yearToY(yr));
+      const isMajor = yr % 10 === 0;
+      const tickW = isMajor ? 8 : 4;
+      ctx.strokeStyle='#000'; ctx.lineWidth = isMajor ? 2 : 1;
+      ctx.beginPath(); ctx.moveTo(AXIS_X - tickW, y); ctx.lineTo(AXIS_X + tickW, y); ctx.stroke();
+      ctx.fillStyle='#000';
+      ctx.font = isMajor ? 'bold 11px Verdana,Arial,sans-serif' : '9px Verdana,Arial,sans-serif';
+      ctx.textAlign='right';
+      ctx.fillText(yr, AXIS_X - tickW - 4, y + 4);
+    }
+
+    layout.forEach(({ item, year, slotIdx, noDate }) => {
+      if (noDate) return;
+      const y = yearToY(year);
+      const x = slotX(slotIdx);
+      const isHov = hovered===item, isSel = selected===item;
+      const r = isHov||isSel ? DOT_R+2 : DOT_R;
+      const color = tc(item.type);
+      const src = item.source;
+      const alpha = src==='fallback'?'66' : src===null?'44' : 'ee';
+
+      if (Math.abs(x-AXIS_X)>1) {
+        ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(AXIS_X,y); ctx.lineTo(x,y); ctx.stroke();
+      }
+      if (isSel) {
+        ctx.beginPath(); ctx.arc(x,y,r+5,0,Math.PI*2);
+        ctx.fillStyle=color+'25'; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.stroke();
+
+      if (item.hasManual) {
+        ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
+        ctx.fillStyle='#000'; ctx.fill();
+      }
+
+      if (isHov||isSel||pxPerY>130) {
+        const lbl = item.title.length>22 ? item.title.slice(0,20)+'…' : item.title;
+        ctx.font=`${isSel?'bold ':''} 9px Verdana,Arial,sans-serif`;
+        ctx.fillStyle='#000'; ctx.textAlign = x >= AXIS_X ? 'left' : 'right';
+        ctx.fillText(lbl, x >= AXIS_X ? x+r+3 : x-r-3, y+3);
+      }
+    });
+
+    if (noDates.length) {
+      ctx.font='9px Verdana,Arial,sans-serif'; ctx.fillStyle='#000'; ctx.textAlign='left';
+      ctx.fillText(`${noDates.length} undated — see Table`, 4, H-6);
+    }
+
+  } else {
+    // ── HORIZONTAL (desktop) ───────────────────────────────────
+    const yr0 = Math.floor(xToYear(0))-1, yr1 = Math.ceil(xToYear(W))+1;
+    const first = Math.ceil(yr0/step)*step;
+
+    // faint vertical grid lines
+    ctx.strokeStyle='rgba(0,0,0,0.12)'; ctx.lineWidth=1;
+    for (let yr=first; yr<=yr1; yr+=step) {
+      const x = Math.round(yearToX(yr));
+      ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+    }
+
+    // axis line
+    ctx.strokeStyle='#000'; ctx.lineWidth=2;
+    ctx.beginPath(); ctx.moveTo(0,AXIS_Y); ctx.lineTo(W,AXIS_Y); ctx.stroke();
+
+    // tick marks + year labels on axis
+    for (let yr=first; yr<=yr1; yr+=step) {
+      const x = Math.round(yearToX(yr));
+      const isMajor = yr % 10 === 0;
+      const tickH = isMajor ? 10 : 5;
+      ctx.strokeStyle='#000'; ctx.lineWidth = isMajor ? 2 : 1;
+      ctx.beginPath(); ctx.moveTo(x, AXIS_Y-tickH); ctx.lineTo(x, AXIS_Y+tickH); ctx.stroke();
+      ctx.fillStyle='#000';
+      ctx.font = isMajor ? 'bold 11px Verdana,Arial,sans-serif' : '9px Verdana,Arial,sans-serif';
+      ctx.textAlign='center';
+      ctx.fillText(yr, x, AXIS_Y+tickH+13);
+    }
+
+    layout.forEach(({ item, year, slotIdx, noDate }) => {
+      if (noDate) return;
+      const x = yearToX(year);
+      const y = slotY(slotIdx);
+      const isHov = hovered===item, isSel = selected===item;
+      const r = isHov||isSel ? DOT_R+2 : DOT_R;
+      const color = tc(item.type);
+      const src = item.source;
+      const alpha = src==='fallback'?'66' : src===null?'44' : 'ee';
+
+      if (Math.abs(y-AXIS_Y)>1) {
+        ctx.strokeStyle='rgba(0,0,0,0.3)'; ctx.lineWidth=1;
+        ctx.beginPath(); ctx.moveTo(x,AXIS_Y); ctx.lineTo(x,y); ctx.stroke();
+      }
+      if (isSel) {
+        ctx.beginPath(); ctx.arc(x,y,r+5,0,Math.PI*2);
+        ctx.fillStyle=color+'25'; ctx.fill();
+      }
+      ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2);
+      ctx.fillStyle=color+(isHov||isSel?'ff':alpha); ctx.fill();
+      ctx.strokeStyle='#000'; ctx.lineWidth=1; ctx.stroke();
+
+      if (item.hasManual) {
+        ctx.beginPath(); ctx.arc(x+r,y-r,3,0,Math.PI*2);
+        ctx.fillStyle='#000'; ctx.fill();
+      }
+
+      if (isHov||isSel||pxPerY>130) {
+        const lbl = item.title.length>32 ? item.title.slice(0,30)+'…' : item.title;
+        ctx.font=`${isSel?'bold ':''} 9px Verdana,Arial,sans-serif`;
+        ctx.fillStyle='#000'; ctx.textAlign='center';
+        ctx.fillText(lbl, x, y<AXIS_Y?y-r-4:y+r+12);
+      }
+    });
+
+    if (noDates.length) {
+      ctx.font='9px Verdana,Arial,sans-serif'; ctx.fillStyle='#000'; ctx.textAlign='left';
+      ctx.fillText(`${noDates.length} undated — see Table view`, 10, H-10);
+    }
   }
 }
 
@@ -636,10 +723,9 @@ function hitTest(mx, my) {
   let best=null, bestD=14;
   layout.forEach(({ item, year, slotIdx, noDate }) => {
     if (noDate) return;
-    const x = yearToX(year);
-    const y = slotY(slotIdx);
-    const d = Math.hypot(mx-x, my-y);
-    if (d<bestD) { bestD=d; best=item; }
+    const px = isVertical ? slotX(slotIdx)  : yearToX(year);
+    const py = isVertical ? yearToY(year)    : slotY(slotIdx);
+    if (Math.hypot(mx-px, my-py) < bestD) { bestD=Math.hypot(mx-px,my-py); best=item; }
   });
   return best;
 }
@@ -649,8 +735,13 @@ function fitView() {
   if (!dated.length) return;
   const ys = dated.map(i=>i.year);
   const mn=Math.min(...ys), mx=Math.max(...ys), span=Math.max(mx-mn,5);
-  zoom = (canvas.width-120)/(span*BASE);
-  camX = 60-mn*BASE*zoom;
+  if (isVertical) {
+    zoom = (canvas.height-120)/(span*BASE);
+    camY = 60-mn*BASE*zoom;
+  } else {
+    zoom = (canvas.width-120)/(span*BASE);
+    camX = 60-mn*BASE*zoom;
+  }
 }
 
 function updateStats() {
@@ -664,37 +755,74 @@ function updateStats() {
 }
 
 function resizeCanvas() {
-  const w = document.getElementById('canvas-wrap');
-  canvas.width=w.clientWidth; canvas.height=w.clientHeight;
+  const wrap = document.getElementById('canvas-wrap');
+  canvas.width=wrap.clientWidth; canvas.height=wrap.clientHeight;
+  isVertical = canvas.width < 640;
   AXIS_Y = Math.round(canvas.height * 0.32);
+  AXIS_X = Math.round(canvas.width * 0.38);
+  fitView();
   render();
 }
 
 // ── CANVAS EVENTS ──────────────────────────────────────────────
-canvas.addEventListener('mousedown', e => { isDrag=true; dragX0=e.clientX; camX0=camX; });
-canvas.addEventListener('mousemove', e => {
+let dragY0=0, camY0=0;
+function getPointer(e) {
   const r=canvas.getBoundingClientRect();
-  if (isDrag) { camX=camX0+(e.clientX-dragX0); render(); return; }
-  const hit=hitTest(e.clientX-r.left, e.clientY-r.top);
-  if (hit!==hovered) { hovered=hit; canvas.style.cursor=hit?'pointer':'grab'; render(); }
+  return {
+    cx: (e.touches?.[0]?.clientX ?? e.clientX) - r.left,
+    cy: (e.touches?.[0]?.clientY ?? e.clientY) - r.top,
+  };
+}
+
+canvas.addEventListener('mousedown', e => {
+  isDrag=true; const {cx,cy}=getPointer(e);
+  dragX0=cx; camX0=camX; dragY0=cy; camY0=camY;
+});
+canvas.addEventListener('mousemove', e => {
+  const {cx,cy}=getPointer(e);
+  if (isDrag) {
+    if (isVertical) camY=camY0+(cy-dragY0); else camX=camX0+(cx-dragX0);
+    render(); return;
+  }
+  const hit=hitTest(cx,cy);
+  if (hit!==hovered) { hovered=hit; canvas.style.cursor=hit?'pointer':'crosshair'; render(); }
 });
 canvas.addEventListener('mouseup', e => {
   if (!isDrag) return;
-  const moved=Math.abs(e.clientX-dragX0)>3; isDrag=false;
-  if (!moved) {
-    const r=canvas.getBoundingClientRect();
-    const hit=hitTest(e.clientX-r.left, e.clientY-r.top);
-    hit ? openDetail(hit.key) : hideDetail();
-  }
+  const {cx,cy}=getPointer(e);
+  const moved = isVertical ? Math.abs(cy-dragY0)>3 : Math.abs(cx-dragX0)>3;
+  isDrag=false;
+  if (!moved) { const hit=hitTest(cx,cy); hit ? openDetail(hit.key) : hideDetail(); }
 });
 canvas.addEventListener('mouseleave', () => { isDrag=false; });
+
+canvas.addEventListener('touchstart', e => {
+  e.preventDefault(); isDrag=true;
+  const {cx,cy}=getPointer(e);
+  dragX0=cx; camX0=camX; dragY0=cy; camY0=camY;
+}, {passive:false});
+canvas.addEventListener('touchmove', e => {
+  e.preventDefault(); const {cx,cy}=getPointer(e);
+  if (isVertical) camY=camY0+(cy-dragY0); else camX=camX0+(cx-dragX0);
+  render();
+}, {passive:false});
+canvas.addEventListener('touchend', () => { isDrag=false; }, {passive:false});
+
 canvas.addEventListener('wheel', e => {
   e.preventDefault();
-  const r=canvas.getBoundingClientRect(), mx=e.clientX-r.left;
-  const yAt=xToYear(mx);
-  zoom=Math.max(.02,Math.min(zoom*(e.deltaY<0?1.15:1/1.15),80));
-  camX=mx-yAt*BASE*zoom; render();
-}, { passive:false });
+  const {cx,cy}=getPointer(e);
+  const factor = e.deltaY<0 ? 1.15 : 1/1.15;
+  if (isVertical) {
+    const yrAt=yToYear(cy);
+    zoom=Math.max(.02,Math.min(zoom*factor,80));
+    camY=cy-yrAt*BASE*zoom;
+  } else {
+    const yrAt=xToYear(cx);
+    zoom=Math.max(.02,Math.min(zoom*factor,80));
+    camX=cx-yrAt*BASE*zoom;
+  }
+  render();
+}, {passive:false});
 
 document.getElementById('bzi').onclick = () => { zoom*=1.4; render(); };
 document.getElementById('bzo').onclick = () => { zoom/=1.4; render(); };
@@ -703,6 +831,24 @@ document.getElementById('dc').onclick  = hideDetail;
 document.getElementById('search-inp').addEventListener('input', e => { q=e.target.value; applyFilters(); });
 
 document.getElementById('btn-refresh').onclick = doScan;
+
+document.getElementById('btn-covers').onclick = () => {
+  const btn = document.getElementById('btn-covers');
+  btn.textContent = 'Fetching…'; btn.disabled = true;
+  const es = new EventSource('/api/covers');
+  es.addEventListener('progress', e => {
+    const d = JSON.parse(e.data);
+    btn.textContent = `${d.done}/${d.total}`;
+  });
+  es.addEventListener('done', e => {
+    es.close(); btn.disabled = false;
+    const d = JSON.parse(e.data);
+    btn.textContent = `Fetch Covers (${d.updated} new)`;
+    // reload items so covers appear
+    fetch('/api/items').then(r=>r.json()).then(items => { allItems=items; applyFilters(); });
+  });
+  es.addEventListener('error', () => { es.close(); btn.disabled=false; btn.textContent='Fetch Covers'; });
+};
 
 // ── ENRICH MODAL ──────────────────────────────────────────────
 document.getElementById('btn-enrich').onclick = () => {

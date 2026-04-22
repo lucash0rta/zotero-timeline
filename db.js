@@ -50,6 +50,7 @@ export function getDb() {
   // Run migrations for existing databases
   try { _db.exec(`ALTER TABLE items ADD COLUMN description TEXT`); } catch {}
   try { _db.exec(`ALTER TABLE items ADD COLUMN site_name TEXT`); } catch {}
+  try { _db.exec(`ALTER TABLE items ADD COLUMN cover_url TEXT`); } catch {}
 
   return _db;
 }
@@ -145,5 +146,6 @@ export function toFrontend(row) {
     confidence: row.manual_year != null ? 'high' : row.enriched_conf,
     note:       row.manual_note || row.enriched_note,
     hasManual:  row.manual_year != null || row.manual_title != null || row.manual_authors != null,
+    coverUrl:   row.cover_url ?? null,
   };
 }
