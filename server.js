@@ -1,14 +1,22 @@
 import express from 'express';
-import { readFileSync, existsSync } from 'fs';
+import { readFileSync, existsSync, mkdirSync } from 'fs';
+import { writeFile, unlink, rename } from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
+import { tmpdir } from 'os';
 import { Buffer } from 'buffer';
 import { createHmac, timingSafeEqual } from 'crypto';
 import { exec } from 'child_process';
+import { promisify } from 'util';
+import { inflateRawSync } from 'zlib';
 import { getDb, getAllItems, getItem, upsertItem, upsertEnrichment, upsertManual, clearManual, getMtimeMap, toFrontend } from './db.js';
 import { enrichItems } from './enrich.js';
 
+const execAsync = promisify(exec);
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const PREVIEWS_DIR = join(__dirname, 'previews');
+if (!existsSync(PREVIEWS_DIR)) mkdirSync(PREVIEWS_DIR);
 
 // ── Load .env ─────────────────────────────────────────────────
 if (existsSync(join(__dirname, '.env'))) {
@@ -409,70 +417,116 @@ app.get('/api/enrich', async (req, res) => {
   }
 });
 
-// ── Cover image fetching ──────────────────────────────────────
-async function fetchCoverForItem(item) {
-  const title   = item.manual_title   || item.title   || '';
-  const authors = item.manual_authors || item.authors || '';
-  const year    = item.manual_year    ?? item.enriched_year ?? item.year ?? null;
+// ── Local preview generation ──────────────────────────────────
 
-  // 1. OpenLibrary search
-  try {
-    const q = encodeURIComponent(`${title} ${authors}`.trim().slice(0, 100));
-    const res = await fetch(
-      `https://openlibrary.org/search.json?q=${q}&limit=1&fields=cover_i,title`,
-      { signal: AbortSignal.timeout(6000) }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      const coverId = data.docs?.[0]?.cover_i;
-      if (coverId) return `https://covers.openlibrary.org/b/id/${coverId}-M.jpg`;
+// Extract a single entry from a ZIP buffer (handles stored + deflate)
+function extractZipEntry(buf, matchFn) {
+  let offset = 0;
+  while (offset + 30 < buf.length) {
+    if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+    const method     = buf.readUInt16LE(offset + 8);
+    const compSize   = buf.readUInt32LE(offset + 18);
+    const fnameLen   = buf.readUInt16LE(offset + 26);
+    const extraLen   = buf.readUInt16LE(offset + 28);
+    const fname      = buf.slice(offset + 30, offset + 30 + fnameLen).toString('utf8');
+    const dataStart  = offset + 30 + fnameLen + extraLen;
+    const compData   = buf.slice(dataStart, dataStart + compSize);
+    if (matchFn(fname)) {
+      try {
+        const data = method === 0 ? compData : inflateRawSync(compData);
+        return { fname, data };
+      } catch { /* corrupt entry */ }
     }
-  } catch { /* network error */ }
+    offset = dataStart + compSize;
+  }
+  return null;
+}
 
-  // 2. Google Books
-  try {
-    const q = encodeURIComponent(`${title} ${authors}`.trim().slice(0, 100));
-    const res = await fetch(
-      `https://www.googleapis.com/books/v1/volumes?q=${q}&maxResults=1`,
-      { signal: AbortSignal.timeout(6000) }
-    );
-    if (res.ok) {
-      const data = await res.json();
-      const thumb = data.items?.[0]?.volumeInfo?.imageLinks?.thumbnail;
-      if (thumb) return thumb.replace('http://', 'https://');
-    }
-  } catch { /* network error */ }
+// Walk all entries in a ZIP buffer
+function* zipEntries(buf) {
+  let offset = 0;
+  while (offset + 30 < buf.length) {
+    if (buf.readUInt32LE(offset) !== 0x04034b50) break;
+    const method   = buf.readUInt16LE(offset + 8);
+    const compSize = buf.readUInt32LE(offset + 18);
+    const fnameLen = buf.readUInt16LE(offset + 26);
+    const extraLen = buf.readUInt16LE(offset + 28);
+    const fname    = buf.slice(offset + 30, offset + 30 + fnameLen).toString('utf8');
+    const dataStart = offset + 30 + fnameLen + extraLen;
+    yield { fname, method, compSize, dataStart };
+    offset = dataStart + compSize;
+  }
+}
+
+async function generatePreview(key, type) {
+  const outPath = join(PREVIEWS_DIR, `${key}.jpg`);
+  if (existsSync(outPath)) return outPath;
+
+  const res = await fetch(`${WEBDAV_BASE}/${key}.zip`, {
+    headers: { 'Authorization': AUTH },
+    signal: AbortSignal.timeout(60000),
+  });
+  if (!res.ok) return null;
+  const zipBuf = Buffer.from(await res.arrayBuffer());
+
+  // ── EPUB: extract cover image from inside the epub (which is also a zip)
+  if (type === 'Ebook') {
+    const epubEntry = extractZipEntry(zipBuf, f => /\.epub$/i.test(f));
+    if (!epubEntry) return null;
+    const epubBuf = epubEntry.data;
+
+    // Priority: file named cover.*, then any image in cover/ or images/, then first image
+    const isImage = f => /\.(jpe?g|png|webp)$/i.test(f);
+    const coverEntry =
+      extractZipEntry(epubBuf, f => isImage(f) && /\bcover\b/i.test(f)) ||
+      extractZipEntry(epubBuf, f => isImage(f) && /\b(cover|images?)\b/i.test(f)) ||
+      extractZipEntry(epubBuf, f => isImage(f));
+    if (!coverEntry) return null;
+    await writeFile(outPath, coverEntry.data);
+    return outPath;
+  }
+
+  // ── PDF: extract to temp, shell out to pdftoppm or ghostscript
+  if (type === 'PDF') {
+    const pdfEntry = extractZipEntry(zipBuf, f => /\.pdf$/i.test(f));
+    if (!pdfEntry) return null;
+    const tmpPdf = join(tmpdir(), `zt_${key}.pdf`);
+    const tmpBase = join(tmpdir(), `zt_${key}_p`);
+    await writeFile(tmpPdf, pdfEntry.data);
+    try {
+      // Try pdftoppm (poppler-utils)
+      await execAsync(`pdftoppm -r 96 -f 1 -l 1 -jpeg -jpegopt quality=70 "${tmpPdf}" "${tmpBase}"`);
+      for (const suffix of ['-1.jpg', '-01.jpg', '-001.jpg']) {
+        if (existsSync(tmpBase + suffix)) {
+          await rename(tmpBase + suffix, outPath);
+          return outPath;
+        }
+      }
+      // Try ghostscript fallback
+      await execAsync(`gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -r96 -dJPEGQ=70 -dFirstPage=1 -dLastPage=1 -sOutputFile="${outPath}" "${tmpPdf}"`);
+      if (existsSync(outPath)) return outPath;
+    } catch { /* tools not installed */ }
+    finally { unlink(tmpPdf).catch(() => {}); }
+    return null;
+  }
 
   return null;
 }
 
-app.get('/api/covers', async (req, res) => {
-  res.setHeader('Content-Type', 'text/event-stream');
-  res.setHeader('Cache-Control', 'no-cache');
-  res.setHeader('Connection', 'keep-alive');
-  const send = (ev, data) => res.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`);
-
-  const db = getDb();
-  const items = db.prepare(`SELECT * FROM items WHERE cover_url IS NULL AND type IN ('PDF','Ebook','Document')`).all();
-
-  if (!items.length) {
-    send('done', { updated: 0 });
-    return res.end();
+// On-demand preview endpoint — generates + caches on first request
+app.get('/api/preview/:key', async (req, res) => {
+  const { key } = req.params;
+  if (!/^[A-Z0-9]{8}$/.test(key)) return res.status(400).end();
+  const item = getItem(key);
+  if (!item) return res.status(404).end();
+  try {
+    const path = await generatePreview(key, item.type);
+    if (!path) return res.status(404).end();
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.sendFile(path);
+  } catch (e) {
+    res.status(500).end();
   }
-
-  let done = 0, updated = 0;
-  await pool(items, 4, async row => {
-    const url = await fetchCoverForItem(row).catch(() => null);
-    if (url) {
-      db.prepare(`UPDATE items SET cover_url=? WHERE key=?`).run(url, row.key);
-      updated++;
-    }
-    done++;
-    send('progress', { done, total: items.length });
-  });
-
-  send('done', { updated });
-  res.end();
 });
 
 // ── API: manual override ──────────────────────────────────────

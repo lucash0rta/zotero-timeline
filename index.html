@@ -197,7 +197,6 @@
       <button id="btn-view-tb" onclick="setView('table')">Table</button>
     </div>
     <button class="tbtn" id="btn-enrich">Enrich Dates</button>
-    <button class="tbtn" id="btn-covers">Fetch Covers</button>
     <button class="tbtn" id="btn-refresh">Rescan</button>
   </div>
 </div>
@@ -478,7 +477,9 @@ async function openDetail(key) {
   const color = tc(item.type);
 
   document.getElementById('di').innerHTML = `
-    ${item.coverUrl ? `<img src="${esc(item.coverUrl)}" alt="cover" style="max-width:100%;max-height:200px;display:block;margin-bottom:10px;border:1px solid #000;">` : ''}
+    <img id="d-preview" src="/api/preview/${esc(item.key)}" alt="preview"
+      style="max-width:100%;max-height:220px;display:block;margin-bottom:10px;border:1px solid #000;"
+      onerror="this.style.display='none'">
     <span class="d-badge" style="border-color:${color};color:${color}">${item.type}</span>
     ${item.hasManual ? ' <span class="src-badge src-manual">edited</span>' : ''}
     <div id="d-title">${esc(item.title)}</div>
@@ -832,23 +833,6 @@ document.getElementById('search-inp').addEventListener('input', e => { q=e.targe
 
 document.getElementById('btn-refresh').onclick = doScan;
 
-document.getElementById('btn-covers').onclick = () => {
-  const btn = document.getElementById('btn-covers');
-  btn.textContent = 'Fetching…'; btn.disabled = true;
-  const es = new EventSource('/api/covers');
-  es.addEventListener('progress', e => {
-    const d = JSON.parse(e.data);
-    btn.textContent = `${d.done}/${d.total}`;
-  });
-  es.addEventListener('done', e => {
-    es.close(); btn.disabled = false;
-    const d = JSON.parse(e.data);
-    btn.textContent = `Fetch Covers (${d.updated} new)`;
-    // reload items so covers appear
-    fetch('/api/items').then(r=>r.json()).then(items => { allItems=items; applyFilters(); });
-  });
-  es.addEventListener('error', () => { es.close(); btn.disabled=false; btn.textContent='Fetch Covers'; });
-};
 
 // ── ENRICH MODAL ──────────────────────────────────────────────
 document.getElementById('btn-enrich').onclick = () => {

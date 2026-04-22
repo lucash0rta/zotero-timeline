@@ -3,3 +3,5 @@
 node_modules/
 items-cache.json
 items-enriched.json
+library.db
+previews/
