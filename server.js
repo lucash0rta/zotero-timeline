@@ -490,23 +490,26 @@ async function generatePreview(key, type) {
   if (type === 'PDF') {
     const pdfEntry = extractZipEntry(zipBuf, f => /\.pdf$/i.test(f));
     if (!pdfEntry) return null;
-    const tmpPdf = join(tmpdir(), `zt_${key}.pdf`);
-    const tmpBase = join(tmpdir(), `zt_${key}_p`);
+    // Keep temp files in PREVIEWS_DIR so rename stays on the same filesystem
+    const tmpPdf  = join(PREVIEWS_DIR, `tmp_${key}.pdf`);
+    const tmpBase = join(PREVIEWS_DIR, `tmp_${key}_p`);
     await writeFile(tmpPdf, pdfEntry.data);
     try {
-      // Try pdftoppm (poppler-utils)
-      await execAsync(`pdftoppm -r 96 -f 1 -l 1 -jpeg -jpegopt quality=70 "${tmpPdf}" "${tmpBase}"`);
+      await execAsync(`pdftoppm -r 96 -f 1 -l 1 -jpeg "${tmpPdf}" "${tmpBase}"`);
       for (const suffix of ['-1.jpg', '-01.jpg', '-001.jpg']) {
         if (existsSync(tmpBase + suffix)) {
           await rename(tmpBase + suffix, outPath);
           return outPath;
         }
       }
-      // Try ghostscript fallback
+      // Ghostscript fallback
       await execAsync(`gs -dNOPAUSE -dBATCH -sDEVICE=jpeg -r96 -dJPEGQ=70 -dFirstPage=1 -dLastPage=1 -sOutputFile="${outPath}" "${tmpPdf}"`);
       if (existsSync(outPath)) return outPath;
     } catch { /* tools not installed */ }
-    finally { unlink(tmpPdf).catch(() => {}); }
+    finally {
+      unlink(tmpPdf).catch(() => {});
+      for (const s of ['-1.jpg','-01.jpg','-001.jpg']) unlink(tmpBase+s).catch(()=>{});
+    }
     return null;
   }
 
