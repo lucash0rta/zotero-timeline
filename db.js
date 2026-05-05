@@ -88,6 +88,21 @@ export function getDb() {
       y          REAL NOT NULL,
       updated_at INTEGER
     );
+
+    -- Zotero collections (synced from Zotero API)
+    CREATE TABLE IF NOT EXISTS zotero_collections (
+      key        TEXT PRIMARY KEY,
+      name       TEXT NOT NULL,
+      parent_key TEXT,
+      color      TEXT NOT NULL
+    );
+
+    -- Zotero collection membership
+    CREATE TABLE IF NOT EXISTS zotero_item_collections (
+      item_key       TEXT NOT NULL,
+      collection_key TEXT NOT NULL,
+      PRIMARY KEY (item_key, collection_key)
+    );
   `);
 
   // Run migrations for existing databases
@@ -293,7 +308,32 @@ export function removeItemFromGroup(groupId, itemKey) {
   getDb().prepare('DELETE FROM group_items WHERE group_id=? AND item_key=?').run(groupId, itemKey);
 }
 
-// Serialise a DB row into the shape the frontend expects
+// ── Zotero collections helpers ────────────────────────────────
+
+export function getZoteroCollections() {
+  return getDb().prepare('SELECT * FROM zotero_collections ORDER BY name').all();
+}
+
+export function getZoteroItemCollections() {
+  const rows = getDb().prepare('SELECT item_key, collection_key FROM zotero_item_collections').all();
+  const map = {};
+  rows.forEach(r => { (map[r.collection_key] = map[r.collection_key] || []).push(r.item_key); });
+  return map;
+}
+
+export function replaceZoteroCollections(collections, itemCollections) {
+  const db = getDb();
+  db.transaction(() => {
+    db.prepare('DELETE FROM zotero_item_collections').run();
+    db.prepare('DELETE FROM zotero_collections').run();
+    const insC  = db.prepare('INSERT OR REPLACE INTO zotero_collections (key, name, parent_key, color) VALUES (?,?,?,?)');
+    collections.forEach(c => insC.run(c.key, c.name, c.parent_key || null, c.color));
+    const insIC = db.prepare('INSERT OR REPLACE INTO zotero_item_collections (item_key, collection_key) VALUES (?,?)');
+    itemCollections.forEach(ic => insIC.run(ic.item_key, ic.collection_key));
+  })();
+}
+
+// ── Serialise a DB row into the shape the frontend expects ────
 export function toFrontend(row) {
   return {
     key:        row.key,

@@ -12,7 +12,8 @@ import { inflateRawSync } from 'zlib';
 import { getDb, getAllItems, getItem, upsertItem, upsertEnrichment, upsertManual, clearManual, getMtimeMap, toFrontend,
   getGraphState, savePositions, createConnection, updateConnection, deleteConnection,
   createConnectionType, updateConnectionType, deleteConnectionType,
-  createGroup, updateGroup, deleteGroup, addItemToGroup, removeItemFromGroup } from './db.js';
+  createGroup, updateGroup, deleteGroup, addItemToGroup, removeItemFromGroup,
+  getZoteroCollections, getZoteroItemCollections, replaceZoteroCollections } from './db.js';
 import { enrichItems } from './enrich.js';
 
 const execAsync = promisify(exec);
@@ -37,9 +38,13 @@ const WEBDAV_PASS    = process.env.WEBDAV_PASS;
 const PORT           = parseInt(process.env.PORT || '3001', 10);
 const APP_USER       = process.env.APP_USER;
 const APP_PASS       = process.env.APP_PASS;
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET;
-const PM2_APP_NAME   = process.env.PM2_APP_NAME || 'zotero-timeline';
-const CONCURRENCY    = 8;
+const WEBHOOK_SECRET    = process.env.WEBHOOK_SECRET;
+const PM2_APP_NAME      = process.env.PM2_APP_NAME || 'zotero-timeline';
+const ZOTERO_USER_ID    = process.env.ZOTERO_USER_ID;
+const ZOTERO_API_KEY    = process.env.ZOTERO_API_KEY;
+const CONCURRENCY       = 8;
+
+const COLL_PALETTE = ['#e11d48','#7c3aed','#0284c7','#0d9488','#ca8a04','#9a3412','#1d4ed8','#15803d'];
 
 if (!WEBDAV_BASE || !WEBDAV_USER || !WEBDAV_PASS) {
   console.error('\nMissing required env vars. Copy .env.example → .env and fill it in.\n');
@@ -381,6 +386,8 @@ app.get('/api/scan', async (req, res) => {
     const items = await scanLibrary(p => send('progress', p));
     send('done', items);
     res.end();
+    // Background collection sync after each scan (fire-and-forget)
+    if (ZOTERO_USER_ID && ZOTERO_API_KEY) syncZoteroCollections().catch(() => {});
   } catch(e) {
     send('error', { message: e.message });
     res.end();
@@ -634,6 +641,78 @@ app.post('/api/graph/groups/:id/items', (req, res) => {
 app.delete('/api/graph/groups/:id/items/:key', (req, res) => {
   removeItemFromGroup(parseInt(req.params.id), req.params.key);
   res.json({ removed: true });
+});
+
+// ── Zotero collection sync ────────────────────────────────────
+
+async function fetchAllPages(url, headers) {
+  let results = [], start = 0, total = Infinity;
+  while (start < total) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}start=${start}&limit=100`, { headers, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`Zotero API ${res.status}: ${res.statusText}`);
+    total = parseInt(res.headers.get('Total-Results') || '0', 10);
+    const page = await res.json();
+    if (!page.length) break;
+    results = results.concat(page);
+    start += page.length;
+  }
+  return results;
+}
+
+async function syncZoteroCollections(onProgress) {
+  if (!ZOTERO_USER_ID || !ZOTERO_API_KEY) return null;
+  const headers = { 'Zotero-API-Key': ZOTERO_API_KEY, 'Zotero-API-Version': '3' };
+  const base = `https://api.zotero.org/users/${ZOTERO_USER_ID}`;
+
+  onProgress && onProgress({ stage: 'fetching_collections' });
+  const rawColls = await fetchAllPages(`${base}/collections?v=3`, headers);
+
+  const knownKeys = new Set(getDb().prepare('SELECT key FROM items').all().map(r => r.key));
+  const collections = rawColls.map((c, i) => ({
+    key:        c.key,
+    name:       c.data.name,
+    parent_key: c.data.parentCollection || null,
+    color:      COLL_PALETTE[i % COLL_PALETTE.length],
+  }));
+
+  const itemCollections = [];
+  for (let i = 0; i < collections.length; i++) {
+    const coll = collections[i];
+    onProgress && onProgress({ stage: 'fetching_items', done: i + 1, total: collections.length, name: coll.name });
+    const keys = await fetchAllPages(`${base}/collections/${coll.key}/items?v=3&format=keys`, headers);
+    keys.forEach(k => { if (knownKeys.has(k)) itemCollections.push({ item_key: k, collection_key: coll.key }); });
+  }
+
+  replaceZoteroCollections(collections, itemCollections);
+  return { collections, itemCollections };
+}
+
+// ── API: Zotero collections ───────────────────────────────────
+app.get('/api/collections', (req, res) => {
+  const configured = !!(ZOTERO_USER_ID && ZOTERO_API_KEY);
+  const collections = getZoteroCollections();
+  const itemCollections = getZoteroItemCollections();
+  res.json({ configured, collections, itemCollections });
+});
+
+app.get('/api/collections/sync', async (req, res) => {
+  if (!ZOTERO_USER_ID || !ZOTERO_API_KEY) {
+    return res.status(501).json({ error: 'ZOTERO_USER_ID and ZOTERO_API_KEY not configured' });
+  }
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  const send = (ev, data) => res.write(`event: ${ev}\ndata: ${JSON.stringify(data)}\n\n`);
+
+  try {
+    await syncZoteroCollections(p => send('progress', p));
+    send('done', { collections: getZoteroCollections(), itemCollections: getZoteroItemCollections() });
+    res.end();
+  } catch(e) {
+    send('error', { message: e.message });
+    res.end();
+  }
 });
 
 app.listen(PORT, () => {

@@ -150,6 +150,10 @@
                border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
+    #coll-filter { background:#fff; border:1px solid #000; color:#000; font-family:inherit;
+                   font-size:11px; padding:2px 6px; display:none; max-width:180px; }
+    #sync-status { font-size:10px; color:#666; white-space:nowrap; display:none; }
+
     /* ── Graph view ─────────────────────────────────────── */
     #graph-wrap { display:none; flex:1; position:relative; overflow:hidden; }
     #graph-wrap.show { display:flex; }
@@ -334,6 +338,8 @@
       <button id="btn-view-gr" onclick="setView('graph')">Graph</button>
     </div>
     <button class="tbtn" id="btn-enrich">Enrich Dates</button>
+    <button class="tbtn" id="btn-sync-coll" style="display:none">Sync Collections</button>
+    <span id="sync-status"></span>
     <button class="tbtn" id="btn-refresh">Rescan</button>
   </div>
 </div>
@@ -341,6 +347,7 @@
 <div id="filterbar">
   <span class="fl">Show:</span>
   <div id="chips"></div>
+  <select id="coll-filter"><option value="">All collections</option></select>
   <input id="search-inp" type="text" placeholder="Search titles, authors…" />
 </div>
 
@@ -423,6 +430,8 @@ let camX = 0, zoom = 1, isDrag = false, dragX0 = 0, camX0 = 0;
 let hovered = null, selected = null;
 let currentView = 'timeline';
 let sortCol = 'year', sortDir = 1;
+let activeCollection = '';
+let collData = { configured: false, collections: [], itemCollections: {} };
 
 const canvas = document.getElementById('tl');
 const ctx = canvas.getContext('2d');
@@ -523,6 +532,69 @@ function loadItems(items) {
   document.getElementById('scan-overlay').classList.add('hidden');
   buildChips();
   applyFilters();
+  loadCollections();
+}
+
+async function loadCollections() {
+  const res = await fetch('/api/collections').catch(() => null);
+  if (!res?.ok) return;
+  collData = await res.json();
+  buildCollFilter();
+  if (collData.configured) document.getElementById('btn-sync-coll').style.display = '';
+}
+
+function buildCollFilter() {
+  const sel = document.getElementById('coll-filter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">All collections</option>';
+  if (!collData.collections.length) { sel.style.display = 'none'; return; }
+  sel.style.display = '';
+
+  // Build parent→children map for indentation
+  const topLevel = collData.collections.filter(c => !c.parent_key);
+  const children = {};
+  collData.collections.forEach(c => { if (c.parent_key) (children[c.parent_key] = children[c.parent_key] || []).push(c); });
+
+  function addOption(c, indent) {
+    const opt = document.createElement('option');
+    opt.value = c.key;
+    opt.textContent = (indent ? '   ↳ ' : '') + c.name;
+    sel.appendChild(opt);
+    (children[c.key] || []).forEach(ch => addOption(ch, true));
+  }
+  topLevel.sort((a,b)=>a.name.localeCompare(b.name)).forEach(c => addOption(c, false));
+  sel.value = prev && collData.collections.find(c => c.key === prev) ? prev : '';
+}
+
+function syncCollections() {
+  const btn = document.getElementById('btn-sync-coll');
+  const status = document.getElementById('sync-status');
+  btn.disabled = true;
+  status.style.display = '';
+  status.textContent = 'Syncing…';
+
+  const es = new EventSource('/api/collections/sync');
+  es.addEventListener('progress', e => {
+    const d = JSON.parse(e.data);
+    status.textContent = d.stage === 'fetching_collections' ? 'Fetching collections…'
+      : `Fetching items: ${d.name} (${d.done}/${d.total})`;
+  });
+  es.addEventListener('done', e => {
+    es.close();
+    collData = { ...collData, ...JSON.parse(e.data) };
+    buildCollFilter();
+    if (currentView === 'graph') renderGroupHalos();
+    status.textContent = `Synced ${collData.collections.length} collections`;
+    setTimeout(() => { status.style.display = 'none'; }, 3000);
+    btn.disabled = false;
+  });
+  es.addEventListener('error', e => {
+    es.close();
+    try { status.textContent = 'Error: ' + JSON.parse(e.data).message; }
+    catch { status.textContent = 'Sync failed'; }
+    setTimeout(() => { status.style.display = 'none'; }, 4000);
+    btn.disabled = false;
+  });
 }
 
 function updateLibInfo() {
@@ -562,6 +634,10 @@ function applyFilters() {
   filtItems = allItems.filter(i =>
     activeTypes.has(i.type) && (!lq || i.title.toLowerCase().includes(lq) || i.authors.toLowerCase().includes(lq))
   );
+  if (activeCollection) {
+    const keys = new Set(collData.itemCollections[activeCollection] || []);
+    filtItems = filtItems.filter(i => keys.has(i.key));
+  }
   updateStats();
   updateLibInfo();
   if (currentView === 'timeline') { fitView(); render(); }
@@ -1141,24 +1217,44 @@ function renderGraphAll() { renderGroupHalos(); renderEdges(); renderNodes(); }
 
 function renderGroupHalos() {
   const layer = document.getElementById('graph-groups-layer');
-  const activeGids = new Set(graphState.groups.map(g=>String(g.id)));
+
+  // Compute valid IDs for custom groups and Zotero collections
+  const activeGids  = new Set(graphState.groups.map(g=>'g'+g.id));
+  const activeCkeys = new Set(collData.collections.map(c=>'z'+c.key));
+  const allValid    = new Set([...activeGids, ...activeCkeys]);
   [...layer.children].forEach(el => {
-    if (!activeGids.has(el.dataset.gid) && !activeGids.has(el.dataset.glid)) el.remove();
+    const id = el.dataset.haloId;
+    if (id && !allValid.has(id)) el.remove();
   });
-  graphState.groups.forEach(group => {
-    const members = (graphState.groupItems[group.id]||[])
-      .map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
+
+  function renderHalo(idPrefix, id, color, members, name, dashed) {
     if (!members.length) return;
     const cx = members.reduce((s,n)=>s+n.x,0)/members.length;
     const cy = members.reduce((s,n)=>s+n.y,0)/members.length;
     const maxR = members.reduce((m,n)=>Math.max(m,Math.hypot(n.x-cx,n.y-cy)),0);
     const rx = Math.max(maxR+64,80), ry = rx*.82;
-    let el = layer.querySelector(`[data-gid="${group.id}"]`);
-    if (!el) { el=svgEl('ellipse',{class:'group-halo','data-gid':group.id}); layer.insertBefore(el,layer.firstChild); }
-    svgSet(el, {cx, cy, rx, ry, fill:group.color, stroke:group.color});
-    let lbl = layer.querySelector(`[data-glid="${group.id}"]`);
-    if (!lbl) { lbl=svgEl('text',{class:'group-label','data-glid':group.id}); layer.appendChild(lbl); }
-    svgSet(lbl, {x:cx, y:cy-ry-8}); lbl.textContent = group.name;
+    const hid = idPrefix + id;
+    let el = layer.querySelector(`[data-halo-id="${hid}"]`);
+    if (!el) { el=svgEl('ellipse',{class:'group-halo','data-halo-id':hid}); layer.insertBefore(el,layer.firstChild); }
+    const attrs = {cx, cy, rx, ry, fill:color, stroke:color};
+    if (dashed) attrs['stroke-dasharray']='6 3';
+    svgSet(el, attrs);
+    let lbl = layer.querySelector(`[data-halo-lbl="${hid}"]`);
+    if (!lbl) { lbl=svgEl('text',{class:'group-label','data-halo-lbl':hid}); layer.appendChild(lbl); }
+    svgSet(lbl, {x:cx, y:cy-ry-8}); lbl.textContent = dashed ? 'Z: ' + name : name;
+  }
+
+  // Custom groups (solid)
+  graphState.groups.forEach(group => {
+    const members = (graphState.groupItems[group.id]||[]).map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
+    renderHalo('g', group.id, group.color, members, group.name, false);
+  });
+
+  // Zotero collections (dashed)
+  collData.collections.forEach(coll => {
+    const itemKeys = new Set(collData.itemCollections[coll.key] || []);
+    const members = graphNodes.filter(n => itemKeys.has(n.key));
+    renderHalo('z', coll.key, coll.color, members, coll.name, true);
   });
 }
 
@@ -1259,17 +1355,24 @@ function syncSVGPositions() {
     if(src&&tgt&&ct&&g) positionEdge(g,conn,src,tgt,ct);
   });
   const glayer = document.getElementById('graph-groups-layer');
-  graphState.groups.forEach(group=>{
-    const members=(graphState.groupItems[group.id]||[]).map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
-    if(!members.length) return;
-    const cx=members.reduce((s,n)=>s+n.x,0)/members.length;
-    const cy=members.reduce((s,n)=>s+n.y,0)/members.length;
-    const maxR=members.reduce((m,n)=>Math.max(m,Math.hypot(n.x-cx,n.y-cy)),0);
+  function syncHalo(hid, memberNodes) {
+    if(!memberNodes.length) return;
+    const cx=memberNodes.reduce((s,n)=>s+n.x,0)/memberNodes.length;
+    const cy=memberNodes.reduce((s,n)=>s+n.y,0)/memberNodes.length;
+    const maxR=memberNodes.reduce((m,n)=>Math.max(m,Math.hypot(n.x-cx,n.y-cy)),0);
     const rx=Math.max(maxR+64,80), ry=rx*.82;
-    const el2=glayer.querySelector(`[data-gid="${group.id}"]`);
-    const lbl=glayer.querySelector(`[data-glid="${group.id}"]`);
+    const el2=glayer.querySelector(`[data-halo-id="${hid}"]`);
+    const lbl=glayer.querySelector(`[data-halo-lbl="${hid}"]`);
     if(el2) svgSet(el2,{cx,cy,rx,ry});
     if(lbl) svgSet(lbl,{x:cx,y:cy-ry-8});
+  }
+  graphState.groups.forEach(group=>{
+    const members=(graphState.groupItems[group.id]||[]).map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
+    syncHalo('g'+group.id, members);
+  });
+  collData.collections.forEach(coll=>{
+    const itemKeys=new Set(collData.itemCollections[coll.key]||[]);
+    syncHalo('z'+coll.key, graphNodes.filter(n=>itemKeys.has(n.key)));
   });
 }
 
@@ -1629,6 +1732,23 @@ function renderGroupsSidebar(sb) {
     };
   });
 
+  // Zotero collections (read-only)
+  if (collData.collections.length) {
+    const hdr=document.createElement('div');
+    hdr.className='gs-header'; hdr.style.cssText='margin-top:14px;border-top:1px solid #000;padding-top:10px;';
+    hdr.innerHTML='Zotero Collections <span style="font-size:9px;font-weight:normal">(from Zotero)</span>';
+    sb.appendChild(hdr);
+    collData.collections.forEach(coll=>{
+      const memberCount=(collData.itemCollections[coll.key]||[]).length;
+      const div=document.createElement('div'); div.className='gs-item';
+      div.innerHTML=`<div class="gs-item-head">
+        <span class="gs-swatch" style="background:${coll.color};border-style:dashed"></span>
+        <span class="gs-name">${esc(coll.name)}</span>
+        <span class="gs-count">${memberCount}</span></div>`;
+      sb.appendChild(div);
+    });
+  }
+
   const newBtn=document.createElement('button'); newBtn.className='gs-new-btn'; newBtn.textContent='+ New Group'; sb.appendChild(newBtn);
   const newForm=document.createElement('div'); newForm.className='gs-new-form';
   newForm.innerHTML=`<div class="gs-edit-row"><label>Name</label><input type="text" id="gs-new-name" placeholder="Group name"/></div>
@@ -1714,6 +1834,12 @@ async function flushPositions() {
 }
 
 // ── TOOLBAR ───────────────────────────────────────────────────
+document.getElementById('btn-sync-coll').onclick = syncCollections;
+document.getElementById('coll-filter').onchange = e => {
+  activeCollection = e.target.value;
+  applyFilters();
+};
+
 document.getElementById('btnRhizomatic').onclick=()=>{
   if(graphMode==='rhizomatic') return; graphMode='rhizomatic';
   document.getElementById('btnRhizomatic').classList.add('active');
