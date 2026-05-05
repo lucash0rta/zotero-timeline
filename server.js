@@ -9,7 +9,10 @@ import { createHmac, timingSafeEqual } from 'crypto';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { inflateRawSync } from 'zlib';
-import { getDb, getAllItems, getItem, upsertItem, upsertEnrichment, upsertManual, clearManual, getMtimeMap, toFrontend } from './db.js';
+import { getDb, getAllItems, getItem, upsertItem, upsertEnrichment, upsertManual, clearManual, getMtimeMap, toFrontend,
+  getGraphState, savePositions, createConnection, updateConnection, deleteConnection,
+  createConnectionType, updateConnectionType, deleteConnectionType,
+  createGroup, updateGroup, deleteGroup, addItemToGroup, removeItemFromGroup } from './db.js';
 import { enrichItems } from './enrich.js';
 
 const execAsync = promisify(exec);
@@ -559,6 +562,78 @@ app.get('/api/items/:key', (req, res) => {
   // Pull description/site_name if they exist
   const ext = db.prepare('SELECT description, site_name, cover_url FROM items WHERE key=?').get(req.params.key);
   res.json({ ...toFrontend(row), description: ext?.description, siteName: ext?.site_name, coverUrl: ext?.cover_url });
+});
+
+// ── API: graph ────────────────────────────────────────────────
+app.get('/api/graph/state', (req, res) => {
+  res.json(getGraphState());
+});
+
+app.put('/api/graph/positions', (req, res) => {
+  const { positions } = req.body;
+  if (!Array.isArray(positions)) return res.status(400).json({ error: 'positions array required' });
+  res.json({ saved: savePositions(positions) });
+});
+
+app.post('/api/graph/connections', (req, res) => {
+  const { sourceKey, targetKey, typeId, note } = req.body;
+  if (!sourceKey || !targetKey || !typeId) return res.status(400).json({ error: 'sourceKey, targetKey, typeId required' });
+  res.json(createConnection(sourceKey, targetKey, typeId, note));
+});
+
+app.patch('/api/graph/connections/:id', (req, res) => {
+  const { typeId, note } = req.body;
+  res.json(updateConnection(parseInt(req.params.id), { typeId, note }));
+});
+
+app.delete('/api/graph/connections/:id', (req, res) => {
+  deleteConnection(parseInt(req.params.id));
+  res.json({ deleted: true });
+});
+
+app.post('/api/graph/connection-types', (req, res) => {
+  const { name, color, directed } = req.body;
+  if (!name || !color) return res.status(400).json({ error: 'name and color required' });
+  res.json(createConnectionType(name, color, directed));
+});
+
+app.patch('/api/graph/connection-types/:id', (req, res) => {
+  const { name, color, directed } = req.body;
+  res.json(updateConnectionType(parseInt(req.params.id), { name, color, directed }));
+});
+
+app.delete('/api/graph/connection-types/:id', (req, res) => {
+  const result = deleteConnectionType(parseInt(req.params.id));
+  if (result.error) return res.status(409).json(result);
+  res.json(result);
+});
+
+app.post('/api/graph/groups', (req, res) => {
+  const { name, color, description } = req.body;
+  if (!name || !color) return res.status(400).json({ error: 'name and color required' });
+  res.json(createGroup(name, color, description));
+});
+
+app.patch('/api/graph/groups/:id', (req, res) => {
+  const { name, color, description } = req.body;
+  res.json(updateGroup(parseInt(req.params.id), { name, color, description }));
+});
+
+app.delete('/api/graph/groups/:id', (req, res) => {
+  deleteGroup(parseInt(req.params.id));
+  res.json({ deleted: true });
+});
+
+app.post('/api/graph/groups/:id/items', (req, res) => {
+  const { itemKey } = req.body;
+  if (!itemKey) return res.status(400).json({ error: 'itemKey required' });
+  addItemToGroup(parseInt(req.params.id), itemKey);
+  res.json({ added: true });
+});
+
+app.delete('/api/graph/groups/:id/items/:key', (req, res) => {
+  removeItemFromGroup(parseInt(req.params.id), req.params.key);
+  res.json({ removed: true });
 });
 
 app.listen(PORT, () => {

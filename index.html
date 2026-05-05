@@ -149,6 +149,122 @@
     .spinner { width:20px; height:20px; border:2px solid #888; border-top-color:#000;
                border-radius:50%; animation:spin .7s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* ── Graph view ─────────────────────────────────────── */
+    #graph-wrap { display:none; flex:1; position:relative; overflow:hidden; }
+    #graph-wrap.show { display:flex; }
+    #graph-svg { width:100%; height:100%; cursor:crosshair; user-select:none; }
+    #graph-svg.panning { cursor:grabbing; }
+    #graph-svg.connect-mode { cursor:crosshair; }
+    #graph-svg.connect-mode .graph-node { cursor:pointer; }
+    .graph-node { cursor:pointer; }
+    .node-label { font-size:9px; font-family:Verdana,Arial,sans-serif; text-anchor:middle;
+                  pointer-events:none; fill:#000; }
+    .group-halo { fill-opacity:0.08; stroke-opacity:0.4; stroke-width:1.5; }
+    .group-label { font-size:10px; font-family:Verdana,Arial,sans-serif; fill:#444;
+                   pointer-events:none; text-anchor:middle; }
+    .graph-edge { cursor:pointer; }
+    .graph-edge line { transition:stroke-width .1s; }
+    .graph-edge:hover line { stroke-width:4 !important; }
+
+    #graph-toolbar { position:absolute; top:10px; left:50%; transform:translateX(-50%);
+                     display:flex; gap:3px; align-items:center;
+                     background:rgba(255,255,255,0.93); border:1px solid #000; padding:5px 8px;
+                     white-space:nowrap; }
+    #graph-toolbar .g-sep { width:1px; background:#000; align-self:stretch; margin:0 3px; }
+    .gbtn { background:#fff; border:1px solid #000; cursor:pointer;
+            font-family:Verdana,Arial,sans-serif; font-size:11px; padding:3px 9px; }
+    .gbtn:hover { background:#000; color:#fff; }
+    .gbtn.active { background:#000; color:#fff; }
+    .gbtn.connect-active { background:#0000cc; color:#fff; border-color:#0000cc; }
+    .connect-hint { font-size:10px; color:#0000cc; padding:0 4px; display:none; }
+    .connect-hint.show { display:inline; }
+
+    #graph-sidebar { position:absolute; top:0; right:0; width:280px; height:100%;
+                     background:rgba(255,255,255,0.96); border-left:1px solid #000;
+                     overflow-y:auto; padding:12px; display:none; }
+    #graph-sidebar.show { display:block; }
+    .gs-header { font-size:12px; font-weight:bold; margin-bottom:10px; display:flex;
+                 justify-content:space-between; align-items:center; }
+    .gs-close { background:none; border:none; font-size:16px; cursor:pointer; line-height:1; }
+    .gs-close:hover { font-weight:bold; }
+    .gs-item { border:1px solid #000; padding:6px 8px; margin-bottom:4px; }
+    .gs-item-head { display:flex; align-items:center; gap:6px; }
+    .gs-swatch { width:12px; height:12px; border:1px solid #000; flex-shrink:0; border-radius:50%; }
+    .gs-name { flex:1; font-size:11px; font-weight:bold; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .gs-count { font-size:10px; color:#666; }
+    .gs-actions { display:flex; gap:3px; }
+    .gsmb { background:none; border:none; cursor:pointer; font-size:10px; padding:1px 4px;
+            font-family:Verdana,Arial,sans-serif; color:#000; }
+    .gsmb:hover { text-decoration:underline; }
+    .gsmb.del { color:#cc0000; }
+    .gs-members { margin-top:6px; border-top:1px solid #ddd; padding-top:6px; display:none; }
+    .gs-members.open { display:block; }
+    .gs-member { display:flex; align-items:center; gap:4px; font-size:10px; margin-bottom:2px; }
+    .gs-member-name { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+                      cursor:pointer; color:#000; }
+    .gs-member-name:hover { text-decoration:underline; }
+    .gs-member-rm { background:none; border:none; cursor:pointer; font-size:11px; color:#666; padding:0; }
+    .gs-member-rm:hover { color:#cc0000; }
+    .gs-edit-form { margin-top:6px; border-top:1px solid #ddd; padding-top:6px; display:none; }
+    .gs-edit-form.open { display:block; }
+    .gs-edit-row { display:flex; gap:4px; align-items:center; margin-bottom:5px; }
+    .gs-edit-row label { font-size:10px; font-weight:bold; min-width:40px; }
+    .gs-edit-row input[type=text] { flex:1; background:#fff; border:1px solid #000;
+                                    font-family:Verdana,Arial,sans-serif; font-size:11px; padding:2px 5px; }
+    .gs-edit-row input[type=color] { width:32px; height:22px; padding:1px; cursor:pointer; border:1px solid #000; }
+    .gs-new-btn { width:100%; background:#fff; border:1px solid #000; cursor:pointer;
+                  font-family:Verdana,Arial,sans-serif; font-size:11px; padding:5px;
+                  margin-top:6px; }
+    .gs-new-btn:hover { background:#000; color:#fff; }
+    .gs-new-form { border:1px solid #000; padding:8px; margin-top:6px; display:none; }
+    .gs-new-form.open { display:block; }
+    .gs-save-btn { background:#fff; border:1px solid #000; cursor:pointer;
+                   font-family:Verdana,Arial,sans-serif; font-size:11px; padding:3px 8px; }
+    .gs-save-btn:hover { background:#000; color:#fff; }
+
+    /* Context menu */
+    #graph-ctx { position:fixed; background:#fff; border:1px solid #000;
+                 font-family:Verdana,Arial,sans-serif; font-size:11px; z-index:400; min-width:160px; }
+    .ctx-i { padding:5px 12px; cursor:pointer; white-space:nowrap; display:flex;
+              justify-content:space-between; align-items:center; }
+    .ctx-i:hover { background:#000; color:#fff; }
+    .ctx-i.ctx-sep { border-top:1px solid #000; margin-top:0; }
+    .ctx-sub { position:fixed; background:#fff; border:1px solid #000; z-index:401; min-width:140px; }
+
+    /* Edge popup */
+    #edge-popup { position:fixed; background:#fff; border:1px solid #000;
+                  padding:8px 10px; font-size:11px; z-index:400; min-width:140px;
+                  font-family:Verdana,Arial,sans-serif; }
+    .ep-type { display:flex; align-items:center; gap:5px; font-weight:bold; margin-bottom:4px; }
+    .ep-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; }
+    .ep-note { color:#444; margin-bottom:6px; font-size:10px; }
+    .ep-btns { display:flex; gap:4px; }
+    .ep-btn { background:#fff; border:1px solid #000; cursor:pointer;
+              font-family:Verdana,Arial,sans-serif; font-size:10px; padding:2px 6px; }
+    .ep-btn:hover { background:#000; color:#fff; }
+    .ep-btn.del { border-color:#cc0000; color:#cc0000; }
+    .ep-btn.del:hover { background:#cc0000; color:#fff; }
+    .ep-edit-form { margin-top:6px; border-top:1px solid #000; padding-top:6px; display:none; }
+    .ep-edit-form.open { display:block; }
+    .ep-edit-form select, .ep-edit-form input { width:100%; background:#fff; border:1px solid #000;
+      font-family:Verdana,Arial,sans-serif; font-size:11px; padding:3px 5px; margin-bottom:4px; }
+
+    /* Connect modal */
+    #connect-modal { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.45);
+                     z-index:200; align-items:center; justify-content:center; }
+    #connect-modal.show { display:flex; }
+    #connect-box { background:#fff; border:1px solid #000; padding:20px 24px; width:min(360px,90vw); }
+    #connect-box h3 { font-size:13px; font-weight:bold; margin-bottom:4px; }
+    #connect-box .cm-sub { font-size:10px; color:#666; margin-bottom:12px; }
+    .cm-field { margin-bottom:10px; }
+    .cm-field label { display:block; font-size:10px; font-weight:bold; margin-bottom:3px; }
+    .cm-field select, .cm-field input { width:100%; background:#fff; border:1px solid #000;
+      font-family:Verdana,Arial,sans-serif; font-size:11px; padding:4px 6px; }
+    .cm-btns { display:flex; gap:6px; }
+    .cm-btns button { flex:1; background:#fff; border:1px solid #000; cursor:pointer;
+                      font-family:Verdana,Arial,sans-serif; font-size:11px; font-weight:bold; padding:6px; }
+    .cm-btns button:hover { background:#000; color:#fff; }
   </style>
 </head>
 <body>
@@ -185,6 +301,26 @@
   </div>
 </div>
 
+<!-- Connect modal -->
+<div id="connect-modal">
+  <div id="connect-box">
+    <h3>[[ Create Connection ]]</h3>
+    <p class="cm-sub" id="connect-sub"></p>
+    <div class="cm-field">
+      <label>Connection Type</label>
+      <select id="cm-type"></select>
+    </div>
+    <div class="cm-field">
+      <label>Note (optional)</label>
+      <input type="text" id="cm-note" placeholder="e.g. directly cited on p.14" />
+    </div>
+    <div class="cm-btns">
+      <button id="cm-save">Save Connection</button>
+      <button id="cm-cancel">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <!-- App shell -->
 <div id="topbar">
   <div id="topbar-inner">
@@ -195,6 +331,7 @@
     <div class="view-toggle">
       <button id="btn-view-tl" class="active" onclick="setView('timeline')">Timeline</button>
       <button id="btn-view-tb" onclick="setView('table')">Table</button>
+      <button id="btn-view-gr" onclick="setView('graph')">Graph</button>
     </div>
     <button class="tbtn" id="btn-enrich">Enrich Dates</button>
     <button class="tbtn" id="btn-refresh">Rescan</button>
@@ -234,6 +371,28 @@
       </thead>
       <tbody id="tbl-body"></tbody>
     </table>
+  </div>
+
+  <!-- Graph -->
+  <div id="graph-wrap">
+    <svg id="graph-svg" xmlns="http://www.w3.org/2000/svg">
+      <defs id="graph-defs"></defs>
+      <g id="graph-root">
+        <g id="graph-groups-layer"></g>
+        <g id="graph-edges-layer"></g>
+        <g id="graph-nodes-layer"></g>
+      </g>
+    </svg>
+    <div id="graph-toolbar">
+      <button class="gbtn active" id="btnRhizomatic">Rhizomatic</button>
+      <button class="gbtn" id="btnGrouped">Grouped</button>
+      <span class="g-sep"></span>
+      <button class="gbtn" id="btnConnect">+ Connect</button>
+      <span class="connect-hint" id="connect-hint">click source…</span>
+      <button class="gbtn" id="btnGroups">Groups</button>
+      <button class="gbtn" id="btnTypes">Types</button>
+    </div>
+    <div id="graph-sidebar"></div>
   </div>
 
   <!-- Detail panel -->
@@ -406,18 +565,24 @@ function applyFilters() {
   updateStats();
   updateLibInfo();
   if (currentView === 'timeline') { fitView(); render(); }
-  else renderTable();
+  else if (currentView === 'table') renderTable();
+  else if (currentView === 'graph') refreshGraphNodes();
 }
 
 // ── VIEW TOGGLE ────────────────────────────────────────────────
 function setView(v) {
+  if (currentView === 'graph' && v !== 'graph') exitGraphView();
   currentView = v;
-  document.getElementById('canvas-wrap').classList.toggle('hide', v === 'table');
-  document.getElementById('table-wrap').classList.toggle('show', v === 'table');
-  document.getElementById('btn-view-tl').classList.toggle('active', v === 'timeline');
-  document.getElementById('btn-view-tb').classList.toggle('active', v === 'table');
-  if (v === 'timeline') { fitView(); render(); }
-  else renderTable();
+  const isGraph = v === 'graph', isTable = v === 'table', isTL = v === 'timeline';
+  document.getElementById('canvas-wrap').classList.toggle('hide', !isTL);
+  document.getElementById('table-wrap').classList.toggle('show', isTable);
+  document.getElementById('graph-wrap').classList.toggle('show', isGraph);
+  document.getElementById('btn-view-tl').classList.toggle('active', isTL);
+  document.getElementById('btn-view-tb').classList.toggle('active', isTable);
+  document.getElementById('btn-view-gr').classList.toggle('active', isGraph);
+  if (isTL) { fitView(); render(); }
+  else if (isTable) renderTable();
+  else if (isGraph) enterGraphView();
 }
 
 // ── TABLE ──────────────────────────────────────────────────────
@@ -881,6 +1046,697 @@ document.getElementById('btn-run-enrich').onclick = () => {
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+
+// ── GRAPH VIEW ────────────────────────────────────────────────
+let graphState = { connectionTypes:[], connections:[], groups:[], groupItems:{}, positions:{} };
+let graphNodes = [];
+let graphMode  = 'rhizomatic';
+let gConnectMode = false, gConnectSrc = null;
+let gSidebarMode = null;
+let gPan  = { x:0, y:0 }, gZoom = 1;
+let gPanActive = false, gPanOrigin = null, gPanStart = null;
+let simRAF = null, simAlpha = 0;
+const SIM_DECAY = 0.015, SIM_MIN = 0.003;
+const gDirtyPos = new Set();
+let gFlushTimer = null, gDragHappened = false;
+let gInteractionInit = false;
+
+function svgEl(tag, attrs={}) {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', tag);
+  svgSet(el, attrs); return el;
+}
+function svgSet(el, attrs) {
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, String(v));
+}
+
+// ── ENTER / EXIT ──────────────────────────────────────────────
+async function enterGraphView() {
+  if (!allItems.length) return;
+  const res = await fetch('/api/graph/state').catch(()=>null);
+  if (res?.ok) graphState = await res.json();
+
+  const svg = document.getElementById('graph-svg');
+  const W = svg.clientWidth||800, H = svg.clientHeight||600;
+
+  graphNodes = allItems.map(item => {
+    const saved = graphState.positions[item.key];
+    return { key:item.key, item, x: saved?saved.x : W/2+(Math.random()-.5)*W*.65,
+             y: saved?saved.y : H/2+(Math.random()-.5)*H*.65, vx:0, vy:0, fixed:false };
+  });
+
+  buildGraphDefs();
+  renderGraphAll();
+  if (!gInteractionInit) { initGraphInteraction(); gInteractionInit = true; }
+  applyGraphTransform();
+  simStart();
+}
+
+function exitGraphView() {
+  simStop(); flushPositions(); closeCtxMenu(); closeEdgePopup(); closeSidebar();
+  gConnectMode = false; gConnectSrc = null;
+  document.getElementById('graph-svg').classList.remove('connect-mode','panning');
+  document.getElementById('btnConnect').classList.remove('connect-active');
+  document.getElementById('connect-hint').classList.remove('show');
+}
+
+function refreshGraphNodes() {
+  if (currentView !== 'graph') return;
+  const existKeys = new Set(graphNodes.map(n=>n.key));
+  const newKeys   = new Set(allItems.map(i=>i.key));
+  graphNodes = graphNodes.filter(n=>newKeys.has(n.key));
+  const svg = document.getElementById('graph-svg');
+  const W = svg.clientWidth||800, H = svg.clientHeight||600;
+  allItems.forEach(item => {
+    if (!existKeys.has(item.key)) {
+      graphNodes.push({ key:item.key, item, x:W/2+(Math.random()-.5)*W*.5,
+                        y:H/2+(Math.random()-.5)*H*.5, vx:0, vy:0, fixed:false });
+    } else {
+      const n = graphNodes.find(n=>n.key===item.key);
+      if (n) n.item = item;
+    }
+  });
+  buildGraphDefs(); renderGraphAll(); simRestart();
+}
+
+// ── SVG DEFS ──────────────────────────────────────────────────
+function buildGraphDefs() {
+  const defs = document.getElementById('graph-defs');
+  defs.innerHTML = '';
+  graphState.connectionTypes.forEach(ct => {
+    if (!ct.directed) return;
+    const m = svgEl('marker', { id:`arrow-${ct.id}`, markerWidth:'8', markerHeight:'8',
+                                 refX:'8', refY:'4', orient:'auto' });
+    m.appendChild(svgEl('path', { d:'M0,0 L0,8 L8,4 z', fill:ct.color }));
+    defs.appendChild(m);
+  });
+  graphNodes.forEach(n => {
+    const cp = svgEl('clipPath', { id:`cp-${n.key}` });
+    cp.appendChild(svgEl('circle', { r:'28', cx:'0', cy:'0' }));
+    defs.appendChild(cp);
+  });
+}
+
+// ── RENDER ALL ────────────────────────────────────────────────
+function renderGraphAll() { renderGroupHalos(); renderEdges(); renderNodes(); }
+
+function renderGroupHalos() {
+  const layer = document.getElementById('graph-groups-layer');
+  const activeGids = new Set(graphState.groups.map(g=>String(g.id)));
+  [...layer.children].forEach(el => {
+    if (!activeGids.has(el.dataset.gid) && !activeGids.has(el.dataset.glid)) el.remove();
+  });
+  graphState.groups.forEach(group => {
+    const members = (graphState.groupItems[group.id]||[])
+      .map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
+    if (!members.length) return;
+    const cx = members.reduce((s,n)=>s+n.x,0)/members.length;
+    const cy = members.reduce((s,n)=>s+n.y,0)/members.length;
+    const maxR = members.reduce((m,n)=>Math.max(m,Math.hypot(n.x-cx,n.y-cy)),0);
+    const rx = Math.max(maxR+64,80), ry = rx*.82;
+    let el = layer.querySelector(`[data-gid="${group.id}"]`);
+    if (!el) { el=svgEl('ellipse',{class:'group-halo','data-gid':group.id}); layer.insertBefore(el,layer.firstChild); }
+    svgSet(el, {cx, cy, rx, ry, fill:group.color, stroke:group.color});
+    let lbl = layer.querySelector(`[data-glid="${group.id}"]`);
+    if (!lbl) { lbl=svgEl('text',{class:'group-label','data-glid':group.id}); layer.appendChild(lbl); }
+    svgSet(lbl, {x:cx, y:cy-ry-8}); lbl.textContent = group.name;
+  });
+}
+
+function renderEdges() {
+  const layer = document.getElementById('graph-edges-layer');
+  const activeCids = new Set(graphState.connections.map(c=>String(c.id)));
+  [...layer.children].forEach(el=>{ if(!activeCids.has(el.dataset.cid)) el.remove(); });
+  graphState.connections.forEach(conn => {
+    const src = graphNodes.find(n=>n.key===conn.source_key);
+    const tgt = graphNodes.find(n=>n.key===conn.target_key);
+    const ct  = graphState.connectionTypes.find(t=>t.id===conn.type_id);
+    if (!src||!tgt||!ct) return;
+    let g = layer.querySelector(`[data-cid="${conn.id}"]`);
+    if (!g) {
+      g = svgEl('g',{class:'graph-edge','data-cid':conn.id});
+      g.appendChild(svgEl('line',{}));
+      g.appendChild(svgEl('line',{stroke:'transparent','stroke-width':'14'}));
+      g.addEventListener('click', e=>{ e.stopPropagation(); showEdgePopup(conn.id, e.clientX, e.clientY); });
+      layer.appendChild(g);
+    }
+    positionEdge(g, conn, src, tgt, ct);
+  });
+}
+
+function positionEdge(g, conn, src, tgt, ct) {
+  const pairs = graphState.connections.filter(c=>
+    (c.source_key===conn.source_key&&c.target_key===conn.target_key)||
+    (c.source_key===conn.target_key&&c.target_key===conn.source_key));
+  const offset = (pairs.findIndex(c=>c.id===conn.id) - (pairs.length-1)/2) * 14;
+  const dx=tgt.x-src.x, dy=tgt.y-src.y, len=Math.sqrt(dx*dx+dy*dy)||1;
+  const nx=-dy/len*offset, ny=dx/len*offset, R=34, t=len>R*2?R/len:0;
+  const x1=src.x+dx*t+nx, y1=src.y+dy*t+ny, x2=tgt.x-dx*t+nx, y2=tgt.y-dy*t+ny;
+  svgSet(g.children[0], {x1,y1,x2,y2,stroke:ct.color,'stroke-width':'2'});
+  svgSet(g.children[1], {x1,y1,x2,y2});
+  if (ct.directed) g.children[0].setAttribute('marker-end',`url(#arrow-${ct.id})`);
+  else g.children[0].removeAttribute('marker-end');
+}
+
+function renderNodes() {
+  const layer = document.getElementById('graph-nodes-layer');
+  const activeKeys = new Set(graphNodes.map(n=>n.key));
+  [...layer.children].forEach(el=>{ if(!activeKeys.has(el.dataset.key)) el.remove(); });
+  graphNodes.forEach(n => {
+    let g = layer.querySelector(`[data-key="${n.key}"]`);
+    if (!g) { g=buildNodeEl(n); layer.appendChild(g); }
+    g.setAttribute('transform',`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);
+    updateNodeGroupRings(g, n.key);
+  });
+}
+
+function buildNodeEl(n) {
+  const color = tc(n.item.type);
+  const g = svgEl('g',{class:'graph-node','data-key':n.key,
+    transform:`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`});
+  g.appendChild(svgEl('g',{class:'group-rings'}));
+  g.appendChild(svgEl('circle',{class:'node-bg',r:'28',fill:color+'aa',stroke:'#000','stroke-width':'1'}));
+  const img = svgEl('image',{href:`/api/preview/${n.key}`,x:'-28',y:'-28',width:'56',height:'56',
+    'clip-path':`url(#cp-${n.key})`,preserveAspectRatio:'xMidYMid slice'});
+  img.addEventListener('error',()=>img.setAttribute('display','none'));
+  g.appendChild(img);
+  g.appendChild(svgEl('circle',{class:'node-ring',r:'28',fill:'none',stroke:'#000','stroke-width':'1'}));
+  const lbl = svgEl('text',{class:'node-label',y:'42'});
+  const t = n.item.title;
+  lbl.textContent = t.length>22 ? t.slice(0,21)+'…' : t;
+  g.appendChild(lbl);
+
+  g.addEventListener('mouseenter',()=>g.querySelector('.node-ring').setAttribute('stroke-width','2.5'));
+  g.addEventListener('mouseleave',()=>g.querySelector('.node-ring').setAttribute('stroke-width','1'));
+  g.addEventListener('mousedown', e=>{ if(e.button!==0) return; e.stopPropagation(); startNodeDrag(n,e); });
+  g.addEventListener('click', e=>{ e.stopPropagation();
+    if(gDragHappened){gDragHappened=false;return;}
+    if(gConnectMode) onConnectNodeClick(n.key); else openDetail(n.key); });
+  g.addEventListener('contextmenu', e=>{ e.preventDefault(); e.stopPropagation(); showNodeCtxMenu(n.key,e.clientX,e.clientY); });
+  return g;
+}
+
+function updateNodeGroupRings(g, key) {
+  const ringsG = g.querySelector('.group-rings');
+  if (!ringsG) return;
+  ringsG.innerHTML = '';
+  graphState.groups.filter(gr=>(graphState.groupItems[gr.id]||[]).includes(key))
+    .forEach((gr,i)=>ringsG.appendChild(svgEl('circle',{r:32+i*4,fill:'none',stroke:gr.color,'stroke-width':'3',opacity:'0.85'})));
+}
+
+// ── TICK POSITION SYNC ────────────────────────────────────────
+function syncSVGPositions() {
+  const layer = document.getElementById('graph-nodes-layer');
+  graphNodes.forEach(n=>{
+    const g=layer.querySelector(`[data-key="${n.key}"]`);
+    if(g) g.setAttribute('transform',`translate(${n.x.toFixed(1)},${n.y.toFixed(1)})`);
+  });
+  const el = document.getElementById('graph-edges-layer');
+  graphState.connections.forEach(conn=>{
+    const src=graphNodes.find(n=>n.key===conn.source_key);
+    const tgt=graphNodes.find(n=>n.key===conn.target_key);
+    const ct =graphState.connectionTypes.find(t=>t.id===conn.type_id);
+    const g  =el.querySelector(`[data-cid="${conn.id}"]`);
+    if(src&&tgt&&ct&&g) positionEdge(g,conn,src,tgt,ct);
+  });
+  const glayer = document.getElementById('graph-groups-layer');
+  graphState.groups.forEach(group=>{
+    const members=(graphState.groupItems[group.id]||[]).map(k=>graphNodes.find(n=>n.key===k)).filter(Boolean);
+    if(!members.length) return;
+    const cx=members.reduce((s,n)=>s+n.x,0)/members.length;
+    const cy=members.reduce((s,n)=>s+n.y,0)/members.length;
+    const maxR=members.reduce((m,n)=>Math.max(m,Math.hypot(n.x-cx,n.y-cy)),0);
+    const rx=Math.max(maxR+64,80), ry=rx*.82;
+    const el2=glayer.querySelector(`[data-gid="${group.id}"]`);
+    const lbl=glayer.querySelector(`[data-glid="${group.id}"]`);
+    if(el2) svgSet(el2,{cx,cy,rx,ry});
+    if(lbl) svgSet(lbl,{x:cx,y:cy-ry-8});
+  });
+}
+
+// ── PHYSICS ───────────────────────────────────────────────────
+function simTick() {
+  simAlpha *= (1-SIM_DECAY);
+  const nodes=graphNodes, n=nodes.length;
+  if(!n) return;
+  const groupK = graphMode==='grouped' ? 0.38 : 0.025;
+
+  for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) {
+    const a=nodes[i], b=nodes[j];
+    let dx=b.x-a.x, dy=b.y-a.y, d2=dx*dx+dy*dy;
+    if(d2>122500||d2<0.01) continue;
+    const d=Math.sqrt(d2), f=(3500/d2)*simAlpha;
+    dx/=d; dy/=d;
+    a.vx-=dx*f; a.vy-=dy*f; b.vx+=dx*f; b.vy+=dy*f;
+  }
+
+  const ki={};
+  nodes.forEach((nd,i)=>{ki[nd.key]=i;});
+  const rest=graphMode==='grouped'?70:120;
+  graphState.connections.forEach(c=>{
+    const si=ki[c.source_key], ti=ki[c.target_key];
+    if(si===undefined||ti===undefined) return;
+    const a=nodes[si], b=nodes[ti];
+    const dx=b.x-a.x, dy=b.y-a.y, d=Math.sqrt(dx*dx+dy*dy)||1;
+    const f=(d-rest)*.07*simAlpha, fx=dx/d*f, fy=dy/d*f;
+    a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
+  });
+
+  Object.entries(graphState.groupItems).forEach(([gid,keys])=>{
+    const ms=keys.map(k=>ki[k]).filter(i=>i!==undefined).map(i=>nodes[i]);
+    if(ms.length<2) return;
+    const cx=ms.reduce((s,m)=>s+m.x,0)/ms.length, cy=ms.reduce((s,m)=>s+m.y,0)/ms.length;
+    ms.forEach(m=>{ m.vx+=(cx-m.x)*groupK*simAlpha; m.vy+=(cy-m.y)*groupK*simAlpha; });
+  });
+
+  const gcx=nodes.reduce((s,nd)=>s+nd.x,0)/n, gcy=nodes.reduce((s,nd)=>s+nd.y,0)/n;
+  const svg=document.getElementById('graph-svg');
+  const tcx=(( svg.clientWidth||800)/2-gPan.x)/gZoom, tcy=((svg.clientHeight||600)/2-gPan.y)/gZoom;
+  nodes.forEach(nd=>{ nd.vx+=(tcx-gcx)*.004*simAlpha; nd.vy+=(tcy-gcy)*.004*simAlpha; });
+
+  nodes.forEach(nd=>{
+    if(nd.fixed){nd.vx=nd.vy=0;return;}
+    nd.vx*=.82; nd.vy*=.82; nd.x+=nd.vx; nd.y+=nd.vy;
+  });
+}
+
+function simStart() {
+  simAlpha=1.0;
+  if(simRAF) cancelAnimationFrame(simRAF);
+  function loop() {
+    if(currentView!=='graph'){simRAF=null;return;}
+    simTick(); syncSVGPositions();
+    if(simAlpha>SIM_MIN) { simRAF=requestAnimationFrame(loop); }
+    else {
+      simRAF=null;
+      graphNodes.forEach(nd=>gDirtyPos.add(nd.key));
+      scheduleFlush();
+    }
+  }
+  simRAF=requestAnimationFrame(loop);
+}
+function simStop() { if(simRAF){cancelAnimationFrame(simRAF);simRAF=null;} }
+function simRestart() { simAlpha=1.0; if(!simRAF) simStart(); }
+
+// ── NODE DRAG ─────────────────────────────────────────────────
+function startNodeDrag(node, e) {
+  node.fixed=true; gDragHappened=false;
+  const sx=e.clientX, sy=e.clientY, nx0=node.x, ny0=node.y;
+  function onMove(me) {
+    if(!gDragHappened&&Math.hypot(me.clientX-sx,me.clientY-sy)>3) gDragHappened=true;
+    if(!gDragHappened) return;
+    node.x=nx0+(me.clientX-sx)/gZoom; node.y=ny0+(me.clientY-sy)/gZoom;
+    const g=document.querySelector(`#graph-nodes-layer [data-key="${node.key}"]`);
+    if(g) g.setAttribute('transform',`translate(${node.x.toFixed(1)},${node.y.toFixed(1)})`);
+    syncSVGPositions();
+  }
+  function onUp() {
+    window.removeEventListener('mousemove',onMove); window.removeEventListener('mouseup',onUp);
+    node.fixed=false;
+    if(gDragHappened){ gDirtyPos.add(node.key); scheduleFlush(); simRestart(); }
+  }
+  window.addEventListener('mousemove',onMove); window.addEventListener('mouseup',onUp);
+}
+
+// ── PAN / ZOOM ────────────────────────────────────────────────
+function initGraphInteraction() {
+  const svg = document.getElementById('graph-svg');
+  svg.addEventListener('mousedown', e=>{
+    if(e.button!==0||e.target.closest('.graph-node')) return;
+    gPanActive=true; gPanOrigin={x:e.clientX,y:e.clientY}; gPanStart={x:gPan.x,y:gPan.y};
+    svg.classList.add('panning');
+  });
+  window.addEventListener('mousemove', e=>{
+    if(!gPanActive) return;
+    gPan.x=gPanStart.x+(e.clientX-gPanOrigin.x); gPan.y=gPanStart.y+(e.clientY-gPanOrigin.y);
+    applyGraphTransform();
+  });
+  window.addEventListener('mouseup', ()=>{ gPanActive=false; document.getElementById('graph-svg')?.classList.remove('panning'); });
+  svg.addEventListener('wheel', e=>{
+    e.preventDefault();
+    const r=svg.getBoundingClientRect(), mx=e.clientX-r.left, my=e.clientY-r.top;
+    const factor=e.deltaY<0?1.15:1/1.15, oldZ=gZoom;
+    gZoom=Math.max(.1,Math.min(gZoom*factor,8));
+    gPan.x=mx-(mx-gPan.x)*(gZoom/oldZ); gPan.y=my-(my-gPan.y)*(gZoom/oldZ);
+    applyGraphTransform();
+  },{passive:false});
+  svg.addEventListener('click', e=>{
+    if(e.target===svg||e.target.id==='graph-root') { closeCtxMenu(); closeEdgePopup(); }
+    if(gConnectMode&&(e.target===svg||e.target.id==='graph-root')) cancelConnectMode();
+  });
+  svg.addEventListener('contextmenu', e=>e.preventDefault());
+}
+
+function applyGraphTransform() {
+  const r = document.getElementById('graph-root');
+  if(r) r.setAttribute('transform',`translate(${gPan.x.toFixed(1)},${gPan.y.toFixed(1)}) scale(${gZoom})`);
+}
+
+// ── CONNECT MODE ──────────────────────────────────────────────
+function toggleConnectMode() {
+  if(gConnectMode) { cancelConnectMode(); return; }
+  gConnectMode=true; gConnectSrc=null;
+  document.getElementById('graph-svg').classList.add('connect-mode');
+  document.getElementById('btnConnect').classList.add('connect-active');
+  document.getElementById('connect-hint').textContent='click source node…';
+  document.getElementById('connect-hint').classList.add('show');
+}
+function cancelConnectMode() {
+  gConnectMode=false; gConnectSrc=null;
+  document.getElementById('graph-svg').classList.remove('connect-mode');
+  document.getElementById('btnConnect').classList.remove('connect-active');
+  document.getElementById('connect-hint').classList.remove('show');
+  document.querySelectorAll('.graph-node .node-ring').forEach(r=>r.setAttribute('stroke-width','1'));
+}
+function onConnectNodeClick(key) {
+  if(!gConnectSrc) {
+    gConnectSrc=key;
+    const g=document.querySelector(`#graph-nodes-layer [data-key="${key}"]`);
+    if(g) g.querySelector('.node-ring').setAttribute('stroke-width','4');
+    document.getElementById('connect-hint').textContent='click target node…';
+  } else if(gConnectSrc===key) {
+    cancelConnectMode();
+  } else {
+    showConnectModal(gConnectSrc, key);
+  }
+}
+function showConnectModal(srcKey, tgtKey) {
+  const si=allItems.find(i=>i.key===srcKey), ti=allItems.find(i=>i.key===tgtKey);
+  document.getElementById('connect-sub').textContent =
+    `"${(si?.title||srcKey).slice(0,28)}" → "${(ti?.title||tgtKey).slice(0,28)}"`;
+  const sel=document.getElementById('cm-type');
+  sel.innerHTML=graphState.connectionTypes.map(ct=>`<option value="${ct.id}">${ct.name}${ct.directed?' →':''}</option>`).join('');
+  document.getElementById('cm-note').value='';
+  document.getElementById('connect-modal').classList.add('show');
+  document.getElementById('cm-save').onclick=async()=>{
+    const typeId=parseInt(sel.value), note=document.getElementById('cm-note').value.trim();
+    await fetch('/api/graph/connections',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({sourceKey:srcKey,targetKey:tgtKey,typeId,note})});
+    document.getElementById('connect-modal').classList.remove('show');
+    cancelConnectMode(); await refreshGraphState();
+  };
+  document.getElementById('cm-cancel').onclick=()=>{
+    document.getElementById('connect-modal').classList.remove('show'); cancelConnectMode();
+  };
+}
+
+// ── REFRESH STATE ─────────────────────────────────────────────
+async function refreshGraphState() {
+  const res=await fetch('/api/graph/state').catch(()=>null);
+  if(!res?.ok) return;
+  graphState=await res.json();
+  buildGraphDefs(); renderGraphAll();
+  if(graphMode==='rhizomatic') simRestart();
+}
+
+// ── CONTEXT MENU ──────────────────────────────────────────────
+function showNodeCtxMenu(key, cx, cy) {
+  closeCtxMenu();
+  const menu=document.createElement('div'); menu.id='graph-ctx';
+  function item(label, fn, hasSub) {
+    const el=document.createElement('div'); el.className='ctx-i';
+    el.innerHTML=`<span>${label}</span>${hasSub?'<span>›</span>':''}`;
+    if(fn) el.addEventListener('click',e=>{e.stopPropagation();fn();});
+    menu.appendChild(el); return el;
+  }
+  function sep() { const d=document.createElement('div');d.className='ctx-i ctx-sep';d.style.cssText='padding:0;height:1px;background:#000';menu.appendChild(d); }
+
+  item('Inspect',()=>{openDetail(key);closeCtxMenu();});
+  item('Connect from here',()=>{ closeCtxMenu();
+    if(!gConnectMode) toggleConnectMode();
+    gConnectSrc=null; onConnectNodeClick(key);
+  });
+  sep();
+
+  const inGroups  = graphState.groups.filter(g=>(graphState.groupItems[g.id]||[]).includes(key));
+  const outGroups = graphState.groups.filter(g=>!(graphState.groupItems[g.id]||[]).includes(key));
+
+  if(outGroups.length) {
+    const el=item('Add to group',null,true);
+    attachSubMenu(el, buildGroupSub(outGroups, async g=>{
+      await fetch(`/api/graph/groups/${g.id}/items`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({itemKey:key})});
+      closeCtxMenu(); await refreshGraphState();
+    }));
+  }
+  if(inGroups.length) {
+    const el=item('Remove from group',null,true);
+    attachSubMenu(el, buildGroupSub(inGroups, async g=>{
+      await fetch(`/api/graph/groups/${g.id}/items/${key}`,{method:'DELETE'});
+      closeCtxMenu(); await refreshGraphState();
+    }));
+  }
+
+  document.body.appendChild(menu);
+  const vw=window.innerWidth, vh=window.innerHeight;
+  menu.style.left=Math.min(cx,vw-180)+'px'; menu.style.top=Math.min(cy,vh-120)+'px';
+  setTimeout(()=>document.addEventListener('click',closeCtxMenu,{once:true}),0);
+}
+
+function buildGroupSub(groups, onSel) {
+  const sub=document.createElement('div'); sub.className='ctx-sub'; sub.style.display='none';
+  groups.forEach(g=>{
+    const el=document.createElement('div'); el.className='ctx-i';
+    el.innerHTML=`<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${g.color};margin-right:6px;border:1px solid #000"></span>${esc(g.name)}`;
+    el.addEventListener('click',e=>{e.stopPropagation();onSel(g);});
+    sub.appendChild(el);
+  });
+  document.body.appendChild(sub); return sub;
+}
+function attachSubMenu(parent, sub) {
+  parent.addEventListener('mouseenter',()=>{
+    const r=parent.getBoundingClientRect(); sub.style.display='block';
+    sub.style.left=r.right+'px'; sub.style.top=r.top+'px';
+  });
+  parent.addEventListener('mouseleave',e=>{ if(!sub.contains(e.relatedTarget)) sub.style.display='none'; });
+  sub.addEventListener('mouseleave',e=>{ if(!parent.contains(e.relatedTarget)) sub.style.display='none'; });
+  parent._sub=sub;
+}
+function closeCtxMenu() {
+  const m=document.getElementById('graph-ctx');
+  if(m){ [...m.children].forEach(c=>{if(c._sub)c._sub.remove();}); m.remove(); }
+  document.querySelectorAll('.ctx-sub').forEach(s=>s.remove());
+}
+
+// ── EDGE POPUP ────────────────────────────────────────────────
+function showEdgePopup(connId, cx, cy) {
+  closeEdgePopup();
+  const conn=graphState.connections.find(c=>c.id===connId);
+  const ct=conn&&graphState.connectionTypes.find(t=>t.id===conn.type_id);
+  if(!conn||!ct) return;
+  const div=document.createElement('div'); div.id='edge-popup';
+  div.innerHTML=`
+    <div class="ep-type"><span class="ep-dot" style="background:${ct.color}"></span><span>${esc(ct.name)}${ct.directed?' →':''}</span></div>
+    ${conn.note?`<div class="ep-note">${esc(conn.note)}</div>`:''}
+    <div class="ep-btns">
+      <button class="ep-btn ep-edit-toggle">Edit</button>
+      <button class="ep-btn del" id="ep-del">Delete</button>
+    </div>
+    <div class="ep-edit-form">
+      <select id="ep-type-sel">${graphState.connectionTypes.map(t=>`<option value="${t.id}"${t.id===conn.type_id?' selected':''}>${esc(t.name)}${t.directed?' →':''}</option>`).join('')}</select>
+      <input type="text" id="ep-note-inp" value="${esc(conn.note||'')}" placeholder="note…" />
+      <div class="ep-btns"><button class="ep-btn" id="ep-save">Save</button></div>
+    </div>`;
+  document.body.appendChild(div);
+  const vw=window.innerWidth, vh=window.innerHeight;
+  div.style.left=Math.min(cx+12,vw-210)+'px'; div.style.top=Math.min(cy+12,vh-190)+'px';
+  div.querySelector('.ep-edit-toggle').onclick=()=>div.querySelector('.ep-edit-form').classList.toggle('open');
+  div.querySelector('#ep-del').onclick=async()=>{ await fetch(`/api/graph/connections/${connId}`,{method:'DELETE'}); closeEdgePopup(); await refreshGraphState(); };
+  div.querySelector('#ep-save').onclick=async()=>{
+    const typeId=parseInt(div.querySelector('#ep-type-sel').value);
+    const note=div.querySelector('#ep-note-inp').value.trim();
+    await fetch(`/api/graph/connections/${connId}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({typeId,note})});
+    closeEdgePopup(); await refreshGraphState();
+  };
+  setTimeout(()=>document.addEventListener('click',e=>{if(!div.contains(e.target))closeEdgePopup();},{once:true}),0);
+}
+function closeEdgePopup() { document.getElementById('edge-popup')?.remove(); }
+
+// ── SIDEBAR ───────────────────────────────────────────────────
+function openSidebar(mode) {
+  if(gSidebarMode===mode){closeSidebar();return;}
+  gSidebarMode=mode;
+  document.getElementById('graph-sidebar').classList.add('show');
+  document.getElementById('btnGroups').classList.toggle('active',mode==='groups');
+  document.getElementById('btnTypes').classList.toggle('active',mode==='types');
+  renderSidebar();
+}
+function closeSidebar() {
+  gSidebarMode=null;
+  document.getElementById('graph-sidebar').classList.remove('show');
+  document.getElementById('btnGroups').classList.remove('active');
+  document.getElementById('btnTypes').classList.remove('active');
+}
+function renderSidebar() {
+  const sb=document.getElementById('graph-sidebar');
+  if(gSidebarMode==='groups') renderGroupsSidebar(sb);
+  else if(gSidebarMode==='types') renderTypesSidebar(sb);
+}
+
+function renderGroupsSidebar(sb) {
+  sb.innerHTML=`<div class="gs-header">Groups <button class="gs-close" id="gs-close">×</button></div>`;
+  document.getElementById('gs-close').onclick=closeSidebar;
+
+  graphState.groups.forEach(group=>{
+    const members=graphState.groupItems[group.id]||[];
+    const item=document.createElement('div'); item.className='gs-item'; item.dataset.gid=group.id;
+    item.innerHTML=`
+      <div class="gs-item-head">
+        <span class="gs-swatch" style="background:${group.color}"></span>
+        <span class="gs-name">${esc(group.name)}</span>
+        <span class="gs-count">${members.length}</span>
+        <span class="gs-actions">
+          <button class="gsmb gs-expand">▸</button>
+          <button class="gsmb gs-edit-btn">edit</button>
+          <button class="gsmb del gs-del-btn">del</button>
+        </span>
+      </div>
+      <div class="gs-members"></div>
+      <div class="gs-edit-form">
+        <div class="gs-edit-row"><label>Name</label><input type="text" class="gs-name-inp" value="${esc(group.name)}"/></div>
+        <div class="gs-edit-row"><label>Color</label><input type="color" class="gs-color-inp" value="${group.color}"/></div>
+        <button class="gs-save-btn gs-save">Save</button>
+      </div>`;
+    sb.appendChild(item);
+    const membersDiv=item.querySelector('.gs-members');
+    const expandBtn=item.querySelector('.gs-expand');
+    expandBtn.onclick=()=>{
+      const open=membersDiv.classList.toggle('open');
+      expandBtn.textContent=open?'▾':'▸';
+      if(open) {
+        membersDiv.innerHTML=members.length
+          ? members.map(k=>{ const it=allItems.find(i=>i.key===k); const t=it?(it.title.length>28?it.title.slice(0,26)+'…':it.title):k;
+              return `<div class="gs-member" data-mk="${k}"><span class="gs-member-name">${esc(t)}</span><button class="gs-member-rm">×</button></div>`; }).join('')
+          : '<div style="font-size:10px;color:#888">No members.</div>';
+        membersDiv.querySelectorAll('.gs-member').forEach(el=>{
+          el.querySelector('.gs-member-name').onclick=()=>openDetail(el.dataset.mk);
+          el.querySelector('.gs-member-rm').onclick=async()=>{
+            await fetch(`/api/graph/groups/${group.id}/items/${el.dataset.mk}`,{method:'DELETE'});
+            await refreshGraphState(); renderSidebar();
+          };
+        });
+      }
+    };
+    item.querySelector('.gs-edit-btn').onclick=()=>item.querySelector('.gs-edit-form').classList.toggle('open');
+    item.querySelector('.gs-save').onclick=async()=>{
+      const name=item.querySelector('.gs-name-inp').value.trim();
+      const color=item.querySelector('.gs-color-inp').value;
+      await fetch(`/api/graph/groups/${group.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color})});
+      await refreshGraphState(); renderSidebar();
+    };
+    item.querySelector('.gs-del-btn').onclick=async()=>{
+      if(!confirm(`Delete group "${group.name}"?`)) return;
+      await fetch(`/api/graph/groups/${group.id}`,{method:'DELETE'});
+      await refreshGraphState(); renderSidebar();
+    };
+  });
+
+  const newBtn=document.createElement('button'); newBtn.className='gs-new-btn'; newBtn.textContent='+ New Group'; sb.appendChild(newBtn);
+  const newForm=document.createElement('div'); newForm.className='gs-new-form';
+  newForm.innerHTML=`<div class="gs-edit-row"><label>Name</label><input type="text" id="gs-new-name" placeholder="Group name"/></div>
+    <div class="gs-edit-row"><label>Color</label><input type="color" id="gs-new-color" value="#6366f1"/></div>
+    <button class="gs-save-btn" id="gs-new-save">Create</button>`;
+  sb.appendChild(newForm);
+  newBtn.onclick=()=>newForm.classList.toggle('open');
+  newForm.querySelector('#gs-new-save').onclick=async()=>{
+    const name=newForm.querySelector('#gs-new-name').value.trim();
+    const color=newForm.querySelector('#gs-new-color').value;
+    if(!name) return;
+    await fetch('/api/graph/groups',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color})});
+    await refreshGraphState(); renderSidebar();
+  };
+}
+
+function renderTypesSidebar(sb) {
+  sb.innerHTML=`<div class="gs-header">Connection Types <button class="gs-close" id="gs-close">×</button></div>`;
+  document.getElementById('gs-close').onclick=closeSidebar;
+
+  graphState.connectionTypes.forEach(ct=>{
+    const useCount=graphState.connections.filter(c=>c.type_id===ct.id).length;
+    const item=document.createElement('div'); item.className='gs-item';
+    item.innerHTML=`
+      <div class="gs-item-head">
+        <span class="gs-swatch" style="background:${ct.color}"></span>
+        <span class="gs-name">${esc(ct.name)}${ct.directed?' →':''}</span>
+        <span class="gs-count">${useCount}</span>
+        <span class="gs-actions">
+          <button class="gsmb gs-edit-btn">edit</button>
+          <button class="gsmb del gs-del-btn">del</button>
+        </span>
+      </div>
+      <div class="gs-edit-form">
+        <div class="gs-edit-row"><label>Name</label><input type="text" class="gs-ct-name" value="${esc(ct.name)}"/></div>
+        <div class="gs-edit-row"><label>Color</label><input type="color" class="gs-ct-color" value="${ct.color}"/></div>
+        <div class="gs-edit-row"><label>Arrow</label><input type="checkbox" class="gs-ct-dir"${ct.directed?' checked':''} style="width:auto"/></div>
+        <button class="gs-save-btn gs-ct-save">Save</button>
+      </div>`;
+    sb.appendChild(item);
+    item.querySelector('.gs-edit-btn').onclick=()=>item.querySelector('.gs-edit-form').classList.toggle('open');
+    item.querySelector('.gs-ct-save').onclick=async()=>{
+      const name=item.querySelector('.gs-ct-name').value.trim();
+      const color=item.querySelector('.gs-ct-color').value;
+      const directed=item.querySelector('.gs-ct-dir').checked;
+      await fetch(`/api/graph/connection-types/${ct.id}`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color,directed})});
+      await refreshGraphState(); renderSidebar();
+    };
+    item.querySelector('.gs-del-btn').onclick=async()=>{
+      if(useCount>0){alert(`Cannot delete: ${useCount} connection(s) use this type.`);return;}
+      if(!confirm(`Delete type "${ct.name}"?`)) return;
+      const r=await fetch(`/api/graph/connection-types/${ct.id}`,{method:'DELETE'});
+      if(!r.ok){const d=await r.json();alert(d.error);return;}
+      await refreshGraphState(); renderSidebar();
+    };
+  });
+
+  const newBtn=document.createElement('button'); newBtn.className='gs-new-btn'; newBtn.textContent='+ New Type'; sb.appendChild(newBtn);
+  const newForm=document.createElement('div'); newForm.className='gs-new-form';
+  newForm.innerHTML=`<div class="gs-edit-row"><label>Name</label><input type="text" id="gs-ct-name" placeholder="Type name"/></div>
+    <div class="gs-edit-row"><label>Color</label><input type="color" id="gs-ct-color" value="#888888"/></div>
+    <div class="gs-edit-row"><label>Arrow</label><input type="checkbox" id="gs-ct-dir" style="width:auto"/></div>
+    <button class="gs-save-btn" id="gs-ct-save">Create</button>`;
+  sb.appendChild(newForm);
+  newBtn.onclick=()=>newForm.classList.toggle('open');
+  newForm.querySelector('#gs-ct-save').onclick=async()=>{
+    const name=newForm.querySelector('#gs-ct-name').value.trim();
+    const color=newForm.querySelector('#gs-ct-color').value;
+    const directed=newForm.querySelector('#gs-ct-dir').checked;
+    if(!name) return;
+    await fetch('/api/graph/connection-types',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,color,directed})});
+    await refreshGraphState(); renderSidebar();
+  };
+}
+
+// ── POSITION FLUSH ────────────────────────────────────────────
+function scheduleFlush() { if(gFlushTimer) clearTimeout(gFlushTimer); gFlushTimer=setTimeout(flushPositions,1500); }
+async function flushPositions() {
+  gFlushTimer=null; if(!gDirtyPos.size) return;
+  const positions=[...gDirtyPos].map(k=>{const n=graphNodes.find(nd=>nd.key===k); return n?{key:k,x:Math.round(n.x),y:Math.round(n.y)}:null;}).filter(Boolean);
+  gDirtyPos.clear(); if(!positions.length) return;
+  await fetch('/api/graph/positions',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({positions})}).catch(()=>{});
+}
+
+// ── TOOLBAR ───────────────────────────────────────────────────
+document.getElementById('btnRhizomatic').onclick=()=>{
+  if(graphMode==='rhizomatic') return; graphMode='rhizomatic';
+  document.getElementById('btnRhizomatic').classList.add('active');
+  document.getElementById('btnGrouped').classList.remove('active');
+  if(currentView==='graph') simRestart();
+};
+document.getElementById('btnGrouped').onclick=()=>{
+  if(graphMode==='grouped') return; graphMode='grouped';
+  document.getElementById('btnGrouped').classList.add('active');
+  document.getElementById('btnRhizomatic').classList.remove('active');
+  if(currentView==='graph') simRestart();
+};
+document.getElementById('btnConnect').onclick=toggleConnectMode;
+document.getElementById('btnGroups').onclick=()=>openSidebar('groups');
+document.getElementById('btnTypes').onclick=()=>openSidebar('types');
+
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape'&&currentView==='graph'){
+    if(gConnectMode) cancelConnectMode();
+    else closeSidebar();
+    closeCtxMenu(); closeEdgePopup();
+  }
+});
 </script>
 </body>
 </html>

@@ -45,12 +45,77 @@ export function getDb() {
     -- Migrate existing DBs that predate description/site_name columns
     CREATE TABLE IF NOT EXISTS _migrations (name TEXT PRIMARY KEY);
     INSERT OR IGNORE INTO _migrations VALUES ('add_description');
+
+    -- Graph: user-defined connection types
+    CREATE TABLE IF NOT EXISTS connection_types (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      name       TEXT NOT NULL,
+      color      TEXT NOT NULL,
+      directed   INTEGER DEFAULT 0,
+      created_at INTEGER
+    );
+
+    -- Graph: connections between items
+    CREATE TABLE IF NOT EXISTS connections (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      source_key TEXT NOT NULL,
+      target_key TEXT NOT NULL,
+      type_id    INTEGER NOT NULL REFERENCES connection_types(id) ON DELETE CASCADE,
+      note       TEXT,
+      created_at INTEGER
+    );
+
+    -- Graph: named groups
+    CREATE TABLE IF NOT EXISTS groups (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      name        TEXT NOT NULL,
+      color       TEXT NOT NULL,
+      description TEXT,
+      created_at  INTEGER
+    );
+
+    -- Graph: group membership
+    CREATE TABLE IF NOT EXISTS group_items (
+      group_id INTEGER REFERENCES groups(id) ON DELETE CASCADE,
+      item_key TEXT NOT NULL,
+      PRIMARY KEY (group_id, item_key)
+    );
+
+    -- Graph: saved node positions
+    CREATE TABLE IF NOT EXISTS graph_positions (
+      item_key   TEXT PRIMARY KEY,
+      x          REAL NOT NULL,
+      y          REAL NOT NULL,
+      updated_at INTEGER
+    );
   `);
 
   // Run migrations for existing databases
   try { _db.exec(`ALTER TABLE items ADD COLUMN description TEXT`); } catch {}
   try { _db.exec(`ALTER TABLE items ADD COLUMN site_name TEXT`); } catch {}
   try { _db.exec(`ALTER TABLE items ADD COLUMN cover_url TEXT`); } catch {}
+
+  // Seed default connection types (only if empty)
+  const typeCount = _db.prepare('SELECT COUNT(*) as n FROM connection_types').get();
+  if (typeCount.n === 0) {
+    const now = Math.floor(Date.now() / 1000);
+    const ins = _db.prepare('INSERT INTO connection_types (name, color, directed, created_at) VALUES (?,?,?,?)');
+    ins.run('Reference',     '#3b82f6', 1, now);
+    ins.run('Ideological',   '#22c55e', 0, now);
+    ins.run('Methodological','#f97316', 0, now);
+    ins.run('Historical',    '#a855f7', 1, now);
+    ins.run('Contradicts',   '#ef4444', 0, now);
+  }
+
+  // Seed default groups (only if empty)
+  const groupCount = _db.prepare('SELECT COUNT(*) as n FROM groups').get();
+  if (groupCount.n === 0) {
+    const now = Math.floor(Date.now() / 1000);
+    const ins = _db.prepare('INSERT INTO groups (name, color, created_at) VALUES (?,?,?)');
+    ins.run('Technical',   '#6366f1', now);
+    ins.run('Ideological', '#22c55e', now);
+    ins.run('Historical',  '#f59e0b', now);
+  }
 
   return _db;
 }
@@ -123,6 +188,109 @@ export function getMtimeMap() {
   const map = {};
   rows.forEach(r => { map[r.key] = r.mtime; });
   return map;
+}
+
+// ── Graph helpers ─────────────────────────────────────────────
+
+export function getGraphState() {
+  const db = getDb();
+  const connectionTypes = db.prepare('SELECT * FROM connection_types ORDER BY id').all();
+  const connections     = db.prepare('SELECT * FROM connections ORDER BY created_at DESC').all();
+  const groups          = db.prepare('SELECT * FROM groups ORDER BY id').all();
+  const giRows          = db.prepare('SELECT group_id, item_key FROM group_items').all();
+  const posRows         = db.prepare('SELECT item_key, x, y FROM graph_positions').all();
+
+  const groupItems = {};
+  giRows.forEach(r => { (groupItems[r.group_id] = groupItems[r.group_id] || []).push(r.item_key); });
+
+  const positions = {};
+  posRows.forEach(r => { positions[r.item_key] = { x: r.x, y: r.y }; });
+
+  return { connectionTypes, connections, groups, groupItems, positions };
+}
+
+export function savePositions(positions) {
+  const db  = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const stmt = db.prepare('INSERT OR REPLACE INTO graph_positions (item_key, x, y, updated_at) VALUES (?,?,?,?)');
+  db.transaction(ps => ps.forEach(p => stmt.run(p.key, p.x, p.y, now)))(positions);
+  return positions.length;
+}
+
+export function createConnection(sourceKey, targetKey, typeId, note) {
+  const db  = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const r   = db.prepare('INSERT INTO connections (source_key, target_key, type_id, note, created_at) VALUES (?,?,?,?,?)').run(sourceKey, targetKey, typeId, note || null, now);
+  return db.prepare('SELECT * FROM connections WHERE id=?').get(r.lastInsertRowid);
+}
+
+export function updateConnection(id, { typeId, note }) {
+  const db = getDb();
+  const fields = [], vals = [];
+  if (typeId !== undefined) { fields.push('type_id=?'); vals.push(typeId); }
+  if (note   !== undefined) { fields.push('note=?');    vals.push(note || null); }
+  if (fields.length) { vals.push(id); db.prepare(`UPDATE connections SET ${fields.join(',')} WHERE id=?`).run(...vals); }
+  return db.prepare('SELECT * FROM connections WHERE id=?').get(id);
+}
+
+export function deleteConnection(id) {
+  getDb().prepare('DELETE FROM connections WHERE id=?').run(id);
+}
+
+export function createConnectionType(name, color, directed) {
+  const db  = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const r   = db.prepare('INSERT INTO connection_types (name, color, directed, created_at) VALUES (?,?,?,?)').run(name, color, directed ? 1 : 0, now);
+  return db.prepare('SELECT * FROM connection_types WHERE id=?').get(r.lastInsertRowid);
+}
+
+export function updateConnectionType(id, { name, color, directed }) {
+  const db = getDb();
+  const fields = [], vals = [];
+  if (name     !== undefined) { fields.push('name=?');     vals.push(name); }
+  if (color    !== undefined) { fields.push('color=?');    vals.push(color); }
+  if (directed !== undefined) { fields.push('directed=?'); vals.push(directed ? 1 : 0); }
+  if (fields.length) { vals.push(id); db.prepare(`UPDATE connection_types SET ${fields.join(',')} WHERE id=?`).run(...vals); }
+  return db.prepare('SELECT * FROM connection_types WHERE id=?').get(id);
+}
+
+export function deleteConnectionType(id) {
+  const db = getDb();
+  const { n } = db.prepare('SELECT COUNT(*) as n FROM connections WHERE type_id=?').get(id);
+  if (n > 0) return { error: 'Type is in use', count: n };
+  db.prepare('DELETE FROM connection_types WHERE id=?').run(id);
+  return { deleted: true };
+}
+
+export function createGroup(name, color, description) {
+  const db  = getDb();
+  const now = Math.floor(Date.now() / 1000);
+  const r   = db.prepare('INSERT INTO groups (name, color, description, created_at) VALUES (?,?,?,?)').run(name, color, description || null, now);
+  return db.prepare('SELECT * FROM groups WHERE id=?').get(r.lastInsertRowid);
+}
+
+export function updateGroup(id, { name, color, description }) {
+  const db = getDb();
+  const fields = [], vals = [];
+  if (name        !== undefined) { fields.push('name=?');        vals.push(name); }
+  if (color       !== undefined) { fields.push('color=?');       vals.push(color); }
+  if (description !== undefined) { fields.push('description=?'); vals.push(description || null); }
+  if (fields.length) { vals.push(id); db.prepare(`UPDATE groups SET ${fields.join(',')} WHERE id=?`).run(...vals); }
+  return db.prepare('SELECT * FROM groups WHERE id=?').get(id);
+}
+
+export function deleteGroup(id) {
+  const db = getDb();
+  db.prepare('DELETE FROM group_items WHERE group_id=?').run(id);
+  db.prepare('DELETE FROM groups WHERE id=?').run(id);
+}
+
+export function addItemToGroup(groupId, itemKey) {
+  getDb().prepare('INSERT OR IGNORE INTO group_items (group_id, item_key) VALUES (?,?)').run(groupId, itemKey);
+}
+
+export function removeItemFromGroup(groupId, itemKey) {
+  getDb().prepare('DELETE FROM group_items WHERE group_id=? AND item_key=?').run(groupId, itemKey);
 }
 
 // Serialise a DB row into the shape the frontend expects
