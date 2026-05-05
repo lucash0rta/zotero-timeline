@@ -548,7 +548,7 @@ function buildCollFilter() {
   const prev = sel.value;
   sel.innerHTML = '<option value="">All collections</option>';
   if (!collData.collections.length) { sel.style.display = 'none'; return; }
-  sel.style.display = '';
+  sel.style.display = 'block';
 
   // Build parent→children map for indentation
   const topLevel = collData.collections.filter(c => !c.parent_key);
