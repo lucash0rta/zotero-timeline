@@ -1381,7 +1381,7 @@ function simTick() {
   simAlpha *= (1-SIM_DECAY);
   const nodes=graphNodes, n=nodes.length;
   if(!n) return;
-  const groupK = graphMode==='grouped' ? 0.38 : 0.025;
+  const groupK = graphMode==='grouped' ? 0.38 : 0.05;
 
   for(let i=0;i<n;i++) for(let j=i+1;j<n;j++) {
     const a=nodes[i], b=nodes[j];
@@ -1404,12 +1404,37 @@ function simTick() {
     a.vx+=fx; a.vy+=fy; b.vx-=fx; b.vy-=fy;
   });
 
-  Object.entries(graphState.groupItems).forEach(([gid,keys])=>{
+  // Intra-group cohesion: pull members toward centroid (custom groups + Zotero collections)
+  const activeGroups=[];
+  const applyGroupGravity=keys=>{
     const ms=keys.map(k=>ki[k]).filter(i=>i!==undefined).map(i=>nodes[i]);
     if(ms.length<2) return;
     const cx=ms.reduce((s,m)=>s+m.x,0)/ms.length, cy=ms.reduce((s,m)=>s+m.y,0)/ms.length;
     ms.forEach(m=>{ m.vx+=(cx-m.x)*groupK*simAlpha; m.vy+=(cy-m.y)*groupK*simAlpha; });
-  });
+    if(graphMode==='rhizomatic'){
+      const r=ms.reduce((mx,m)=>Math.max(mx,Math.hypot(m.x-cx,m.y-cy)),0);
+      activeGroups.push({ms,cx,cy,r});
+    }
+  };
+  Object.values(graphState.groupItems).forEach(applyGroupGravity);
+  Object.values(collData.itemCollections||{}).forEach(applyGroupGravity);
+
+  // Inter-group centroid repulsion: push overlapping groups apart (rhizomatic only)
+  if(graphMode==='rhizomatic'){
+    for(let i=0;i<activeGroups.length;i++){
+      for(let j=i+1;j<activeGroups.length;j++){
+        const ga=activeGroups[i], gb=activeGroups[j];
+        const dx=gb.cx-ga.cx, dy=gb.cy-ga.cy;
+        const d=Math.sqrt(dx*dx+dy*dy)||1;
+        const minD=Math.min(Math.max(ga.r+gb.r+100,180),400);
+        if(d>=minD) continue;
+        const f=Math.min((minD-d)/minD*0.12,0.5)*simAlpha;
+        const nx=dx/d, ny=dy/d;
+        ga.ms.forEach(m=>{m.vx-=nx*f; m.vy-=ny*f;});
+        gb.ms.forEach(m=>{m.vx+=nx*f; m.vy+=ny*f;});
+      }
+    }
+  }
 
   const gcx=nodes.reduce((s,nd)=>s+nd.x,0)/n, gcy=nodes.reduce((s,nd)=>s+nd.y,0)/n;
   const svg=document.getElementById('graph-svg');
