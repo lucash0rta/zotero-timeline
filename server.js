@@ -660,6 +660,22 @@ async function fetchAllPages(url, headers) {
   return results;
 }
 
+async function fetchAllKeysPages(url, headers) {
+  let results = [], start = 0, total = Infinity;
+  while (start < total) {
+    const sep = url.includes('?') ? '&' : '?';
+    const res = await fetch(`${url}${sep}start=${start}&limit=100`, { headers, signal: AbortSignal.timeout(15000) });
+    if (!res.ok) throw new Error(`Zotero API ${res.status}: ${res.statusText}`);
+    total = parseInt(res.headers.get('Total-Results') || '0', 10);
+    const text = await res.text();
+    const page = text.trim().split('\n').filter(Boolean);
+    if (!page.length) break;
+    results = results.concat(page);
+    start += page.length;
+  }
+  return results;
+}
+
 async function syncZoteroCollections(onProgress) {
   if (!ZOTERO_USER_ID || !ZOTERO_API_KEY) return null;
   const headers = { 'Zotero-API-Key': ZOTERO_API_KEY, 'Zotero-API-Version': '3' };
@@ -680,7 +696,7 @@ async function syncZoteroCollections(onProgress) {
   for (let i = 0; i < collections.length; i++) {
     const coll = collections[i];
     onProgress && onProgress({ stage: 'fetching_items', done: i + 1, total: collections.length, name: coll.name });
-    const keys = await fetchAllPages(`${base}/collections/${coll.key}/items?v=3&format=keys`, headers);
+    const keys = await fetchAllKeysPages(`${base}/collections/${coll.key}/items?v=3&format=keys`, headers);
     keys.forEach(k => { if (knownKeys.has(k)) itemCollections.push({ item_key: k, collection_key: coll.key }); });
   }
 
